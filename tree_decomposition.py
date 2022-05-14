@@ -1,12 +1,8 @@
-from email.mime import base
-from math import comb
-from turtle import back
-from nbformat import current_nbformat_minor
-import networkx as nx
-import matplotlib
-# matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from cmath import exp
 from rdkit import Chem
+import networkx as nx
+import matplotlib.pyplot as plt
+# matplotlib.use("Agg")
 import json
 
 
@@ -31,13 +27,28 @@ def conv_mol_to_nx(mol, SMILES, ssr):
 
     molGraph = nx.Graph()
 
+    atomIR = set().union(*ssr)
+    atomNNIR = []
+
     # add atoms into networkx graph
     for atom in mol.GetAtoms():
         index_atom = "{}_{}".format(atom.GetIdx(), atom.GetSymbol())
+
+        if atom.GetIdx() not in atomIR:
+            atomNNIR.append(index_atom)
+        
         molGraph.add_nodes_from([index_atom])
         
+    # bond that is not involved ring
+    bondNNIR = []
+    bondIR = []
+    for ring in ssr:
+        for i in range(len(ring)):
+            bondIR.append({ring[i], ring[(i+1) % len(ring)]})
+
     # add bonds into networkx graph
     for bond in mol.GetBonds():
+
         startAtom = "{}_{}".format(
             bond.GetBeginAtomIdx(), 
             bond.GetBeginAtom().GetSymbol()
@@ -47,10 +58,14 @@ def conv_mol_to_nx(mol, SMILES, ssr):
             bond.GetEndAtom().GetSymbol()
         )
         bondType = bond.GetBondTypeAsDouble()
+
+        if set([bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()]) not in bondIR:
+            bondNNIR.append([startAtom, endAtom, bondType])
+
         # print(startAtom, endAtom, bondType)
         molGraph.add_edge(startAtom, endAtom, bondType=bondType)
 
-    return molGraph
+    return molGraph, bondNNIR, atomNNIR
 
 
 def rankSeleNode(molGraph, ring, intersection_atom_list):
@@ -274,12 +289,15 @@ def formTriClique(molGraph, SMILES, ssr):
         
         elif intersection_dict.get("N"):
             intersection_atom_list = intersection_dict['N']
+
+            # if ring has more than one non ring connection
             if len(intersection_atom_list) > 1:
                 nodes_part_of_conn = set().union(*intersection_atom_list)
 
                 seleNode = rankSeleNode(molGraph, ring , list(nodes_part_of_conn))
                 print("N_seleNode0", seleNode)
             else:
+            # else, choose one atom beside the connection
                 intersection_atom_list = set().union(*intersection_atom_list)
                 intersectingNode = list(intersection_atom_list)[0]
                 seleList = list(molGraph.neighbors(intersectingNode))
@@ -327,8 +345,46 @@ def checkOverlap(cliqList):
 
     return cliqPairList
 
-def conv_graph_to_tree(molGraph, ring_pair_dictionary):
+def bond_encoding(treeNode, bond_dict):
+
+    tempBond = []
+    for i in range(len(treeNode)):
+        tempBond.append([treeNode[i], treeNode[(i+1) % len(treeNode)]])
+
+
+    print(tempBond)
+
+    print("tempBond", tempBond[0].reverse())
+
+    print(bond_dict.get(tuple()))
+
+
+    bondEncode = ""
+    for bond in tempBond:
+        if bond_dict.get(tuple(bond)):
+            bondEncode += str(bond_dict.get(tuple(bond)))
+        else:
+            bondEncode += str(bond_dict.get(tuple(bond.reverse())))
+    
+    print(bondEncode)
+
+    raise
+
+    
+
+
+def conv_graph_to_tree(molGraph, ring_pair_dictionary, bondNNIR, atomNNIR):
     masterTree = nx.Graph()
+
+    print()
+    bond_dict = {}
+    for line in nx.generate_edgelist(molGraph, data=['bondType']):
+        startAtom, endAtom, bondType = line.split(" ")
+        bond_dict[tuple([startAtom, endAtom])] = float(bondType)
+
+    # print("bond_dict", bond_dict)
+
+    edgeList = []
 
     for ring, intersection_dict in ring_pair_dictionary.items():
         print(ring)
@@ -340,12 +396,38 @@ def conv_graph_to_tree(molGraph, ring_pair_dictionary):
             cliqList = nx.cliques_containing_node(molGraph, nodes=seleNode)
             cliqPairList = checkOverlap(cliqList)
 
+            print("cliqList", cliqList)
             for cliqPair in cliqPairList:
                 
-            # print("ring", ring)
-            # print("cliqs", cliqList)
-            # print("seleNode", seleNode)
-            # print()
+                treeNodeStart = bond_encoding(cliqPair[0][0], bond_dict)
+                raise
+
+                treeNodeEnd = bond_encoding(cliqPair[0][1], bond_dict)
+
+
+                if not cliqList:
+                    break
+                if cliqPair[0][0] in cliqList:
+                    cliqList.remove(cliqPair[0][0])
+                if cliqPair[0][1] in cliqList:
+                    cliqList.remove(cliqPair[0][1])
+
+            
+            
+            
+            
+        if intersection_dict.get("N"):
+            print("N atom", intersection_dict.get("N"))
+    
+    print(bondNNIR)
+    print(atomNNIR)
+
+    #         for cliqPair in cliqPairList:
+                
+    #         print("ring", ring)
+    #         print("cliqs", cliqList)
+    #         print("seleNode", seleNode)
+    #         print()
 
     # for cliq in nx.enumerate_all_cliques(molGraph):
     #     print(cliq)
@@ -385,9 +467,13 @@ def test():
     # SMILES = "C1CCC2(CC1)CCC1(CCCCC1)CC2"
     # SMILES = "C(C1CCCCC1)C1CCCC(C1)C1CCCCC1"
 
+    SMILES = "C1CCC(CC1)C1CCC2CCCCC(C2)C1" # basic bridge + NNIR
+    SMILES = "C(C1CCCCC1)C1CCC2CCCCC(C1)C2" # basic bridge + NNIR
+
+
     # SMILES = "C1CCC2(CC1)CCCCC2" # basic spiro
     # SMILES = "C1CCC2CCCCC2C1" # basic fused
-    SMILES = "C1CCC2CCCCC(C1)C2" # basic bridged
+    # SMILES = "C1CCC2CCCCC(C1)C2" # basic bridged
     # SMILES = "C1CCC(CC1)C1CCCCC1" # basic one bond in between
     # SMILES = "C(C1CCCCC1)C1CCCCC1" # basic two bonds in between
     # SMILES = "C1CCC2CC3CCCCC3CC2C1" # basic ring in between
@@ -396,14 +482,14 @@ def test():
     mol = Chem.MolFromSmiles(SMILES)
     ssr = get_SSSR_from_mol(mol)
     # print(ssr)
-    molGraph = conv_mol_to_nx(mol, SMILES, ssr)
+    molGraph, bondNNIR, atomNNIR = conv_mol_to_nx(mol, SMILES, ssr)
     draw_mol_graph(molGraph=molGraph, figName=figname+".png")
     cliqGraph = molGraph.copy()
     cliqGraph, ring_pair_dictionary = formTriClique(cliqGraph, SMILES, ssr)
     tree = draw_mol_graph(molGraph=cliqGraph, figName=figname+"_out.png")
 
     tree = cliqGraph.copy()
-    conv_graph_to_tree(tree, ring_pair_dictionary)
+    conv_graph_to_tree(tree, ring_pair_dictionary, bondNNIR, atomNNIR)
     
     
 
