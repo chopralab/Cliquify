@@ -60,7 +60,8 @@ def conv_mol_to_nx(mol, SMILES, ssr):
         bondType = bond.GetBondTypeAsDouble()
 
         if set([bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()]) not in bondIR:
-            bondNNIR.append([startAtom, endAtom, bondType])
+            # bondNNIR.append([startAtom, endAtom, bondType])
+            bondNNIR.append([startAtom, endAtom])
 
         # print(startAtom, endAtom, bondType)
         molGraph.add_edge(startAtom, endAtom, bondType=bondType)
@@ -340,38 +341,33 @@ def checkOverlap(cliqList):
                 cliqPairList.append([[cliq, cliq2] , 0])
 
     cliqPairList.sort(key=lambda x:x[1], reverse=True)
-    print("cliqPairList" ,cliqPairList)
+    # print("cliqPairList" ,cliqPairList)
     print()  
 
     return cliqPairList
 
 def bond_encoding(treeNode, bond_dict):
 
-    tempBond = []
+    tempBondList = []
     for i in range(len(treeNode)):
-        tempBond.append([treeNode[i], treeNode[(i+1) % len(treeNode)]])
+        tempBondList.append([treeNode[i], treeNode[(i+1) % len(treeNode)]])
 
-
-    print(tempBond)
-
-    print("tempBond", tempBond[0].reverse())
-
-    print(bond_dict.get(tuple()))
-
+    # print("bond_dict", bond_dict)
 
     bondEncode = ""
-    for bond in tempBond:
-        if bond_dict.get(tuple(bond)):
+    for bond in tempBondList:
+
+        if bond_dict.get(tuple(bond)) is not None:
             bondEncode += str(bond_dict.get(tuple(bond)))
         else:
-            bondEncode += str(bond_dict.get(tuple(bond.reverse())))
+            bondEncode += str(bond_dict.get(tuple(bond[::-1])))
+        
+        bondEncode += "|"
+
+    treeNodeEncode = "|".join(treeNode)
+    # print("treeNodeEncode", treeNodeEncode)
     
-    print(bondEncode)
-
-    raise
-
-    
-
+    return [treeNodeEncode, bondEncode]
 
 def conv_graph_to_tree(molGraph, ring_pair_dictionary, bondNNIR, atomNNIR):
     masterTree = nx.Graph()
@@ -400,10 +396,9 @@ def conv_graph_to_tree(molGraph, ring_pair_dictionary, bondNNIR, atomNNIR):
             for cliqPair in cliqPairList:
                 
                 treeNodeStart = bond_encoding(cliqPair[0][0], bond_dict)
-                raise
-
                 treeNodeEnd = bond_encoding(cliqPair[0][1], bond_dict)
 
+                edgeList.append([treeNodeStart, treeNodeEnd])
 
                 if not cliqList:
                     break
@@ -413,14 +408,22 @@ def conv_graph_to_tree(molGraph, ring_pair_dictionary, bondNNIR, atomNNIR):
                     cliqList.remove(cliqPair[0][1])
 
             
-            
-            
-            
         if intersection_dict.get("N"):
+            nonRing_list = intersection_dict.get("N")
+            for atom_nonRing in nonRing_list:
+                print(atom_nonRing)
+                cliqList_nonRing = nx.cliques_containing_node(molGraph, nodes=atom_nonRing[0])
+                print("cliqList_N", cliqList_nonRing)
+
+            raise
             print("N atom", intersection_dict.get("N"))
     
+    print()
     print(bondNNIR)
     print(atomNNIR)
+    print()
+
+    print(edgeList)
 
     #         for cliqPair in cliqPairList:
                 
@@ -467,7 +470,7 @@ def test():
     # SMILES = "C1CCC2(CC1)CCC1(CCCCC1)CC2"
     # SMILES = "C(C1CCCCC1)C1CCCC(C1)C1CCCCC1"
 
-    SMILES = "C1CCC(CC1)C1CCC2CCCCC(C2)C1" # basic bridge + NNIR
+    # SMILES = "C1CCC(CC1)C1CCC2CCCCC(C2)C1" # basic bridge + NNIR
     SMILES = "C(C1CCCCC1)C1CCC2CCCCC(C1)C2" # basic bridge + NNIR
 
 
