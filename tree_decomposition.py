@@ -1,4 +1,3 @@
-from cmath import exp
 from rdkit import Chem
 import networkx as nx
 import matplotlib.pyplot as plt
