@@ -1,4 +1,3 @@
-from cmath import exp
 from rdkit import Chem
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -19,7 +18,9 @@ def get_SSSR_from_mol(mol):
 	for ring in ssr:
 		l = list(ring)
 		ssr_conv.append(l)
-
+        
+    # DO BRIDGE GROUPING, AND LEAVE ONLY TWO COMPATIBLE RINGS 
+    
 	# Return the SSR
 	return ssr_conv
 
@@ -204,7 +205,7 @@ def formTriClique(molGraph, SMILES, ssr):
                 if len(sum_of_bridge_atom.intersection(set(neighbors_list))) == 3:
                     bridge_seleNode_list.append(atom)
 
-            # print("bridge_seleNode_list" , bridge_seleNode_list)
+            print("bridge_seleNode_list" , bridge_seleNode_list)
 
             intersection_dict["seleNode"] = [bridge_seleNode_list[0]]
             
@@ -474,6 +475,9 @@ def test():
     SMILES = "C(C1CCCCC1)C1CCC2CCCCC(C1)C2" # basic bridge + NNIR
 
 
+    # SMILES = "O=C1[C@@H]2C=C[C@@H](C=CC2)C1(c1ccccc1)c1ccccc1"
+    SMILES = "C1CC2C=CC1CC=C2"
+
     # SMILES = "C1CCC2(CC1)CCCCC2" # basic spiro
     # SMILES = "C1CCC2CCCCC2C1" # basic fused
     # SMILES = "C1CCC2CCCCC(C1)C2" # basic bridged
@@ -485,6 +489,7 @@ def test():
     mol = Chem.MolFromSmiles(SMILES)
     ssr = get_SSSR_from_mol(mol)
     # print(ssr)
+    # print()
     molGraph, bondNNIR, atomNNIR = conv_mol_to_nx(mol, SMILES, ssr)
     draw_mol_graph(molGraph=molGraph, figName=figname+".png")
     cliqGraph = molGraph.copy()
