@@ -81,16 +81,33 @@ class MolTreeNode(object):
     def add_neighbor(self, nei_node):
         self.neighbors.append(nei_node)
 
-    def recover(self, original_graph):
+    def recover_G(self, original_graph):
         clique = []
         clique.extend(self.clique)
 
         if not self.is_leaf:
             for cidx in self.clique:
                 original_graph.nodes[cidx]["MapNum"] = self.nid
-            
-            print(original_graph.nodes)
-            raise
+        
+        for nei_node in self.neighbors:
+            clique.extend(nei_node.clique)
+            if nei_node.is_leaf: #Leaf node, no need to mark 
+                continue
+            for cidx in nei_node.clique:
+                #allow singleton node override the atom mapping
+                if cidx not in self.clique or len(nei_node.clique) == 1: # neighboring node atom will only override non ctr clique atom
+                    node = original_graph.nodes[cidx]
+                    node["MapNum"] = nei_node.nid
+                    print(cidx, nei_node.nid, 'current', self.nid)
+        
+        print()
+
+        clique = list(set(clique))
+        self.label_G = original_graph.subgraph(clique)
+        # if not self.is_leaf:
+        #     draw_mol(subgraph, self.nid, ['MapNum', 'bond_type', 'color'])
+
+        return self.label_G
             
 
 
@@ -557,9 +574,22 @@ def main():
     #     (5, 14, 2), (9, 15, 5), (9, 15, 14), (9, 12, 14),
     #     (15, 5, 14), (12, 14, 2), (15, 14), (8, 9, 5)
     # ]
+
+    # cliques = [
+    #     (9, 15, 5), (9, 15, 14), (9, 12, 14), (14, 2, 12),
+    #     (15, 2, 14), (15, 5, 2), (15, 14)
+    # ]
+    # molTreeEdges = [
+    #     (0, 6), (1, 6), (2, 6), (3, 6), (4, 6), (5, 6)
+    # ]
+
+    # complete
     cliques = [
         (9, 15, 5), (9, 15, 14), (9, 12, 14), (14, 2, 12),
-        (15, 2, 14), (15, 5, 2), (15, 14)
+        (15, 2, 14), (15, 5, 2), (15, 14), (1, 2, 12), (2, 4, 5), (5, 9, 6), (9, 11, 12)
+    ]
+    molTreeEdges = [
+        (0, 6), (1, 6), (2, 6), (3, 6), (4, 6), (5, 6), (3, 7), (5, 8), (0, 9), (2, 10)
     ]
 
     # original_graph = get_subgraph(mol, cliques)
@@ -567,9 +597,6 @@ def main():
     ghost_edges = [(9, 5), (9, 6), (9, 7), (9, 14), (9, 12), (9, 11), (12, 2), (12, 1), (12, 0), (2, 15), (2, 5), (2, 4)]
     triangulated_graph = add_ghost_edges(original_graph, ghost_edges)
 
-    molTreeEdges = [
-        (0, 6), (1, 6), (2, 6), (3, 6), (4, 6), (5, 6)
-    ]
 
     list_of_nodes = []
     for clique in cliques:
@@ -615,7 +642,7 @@ def main():
             # raise
 
     for node in list_of_nodes:
-        node.recover(triangulated_graph)
+        node.recover_G(triangulated_graph.copy())
 
     raise
 

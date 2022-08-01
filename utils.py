@@ -103,7 +103,7 @@ def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color']):
     pos = nx.spring_layout(cand_G)
     nx.draw(cand_G, pos)
     node_labels = nx.get_node_attributes(cand_G, symbol)
-    node_labels = {k : "     {}".format(v) for k, v in node_labels.items()}
+    node_labels = {k : "       ({})".format(v) for k, v in node_labels.items()}
     nx.draw_networkx_labels(cand_G, pos, node_labels)
     edge_labels = nx.get_edge_attributes(cand_G, bond_type)
     nx.draw_networkx_edge_labels(cand_G, pos, edge_labels)
