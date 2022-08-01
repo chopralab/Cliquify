@@ -16,12 +16,12 @@
 
 # print(y)
 
-import networkx as nx
+# import networkx as nx
 
-G = nx.Graph()
-G.add_edge(*[1, 2])
-G.add_edge(*[4, 2])
-G.add_edge(*[7, 2])
+# G = nx.Graph()
+# G.add_edge(*[1, 2])
+# G.add_edge(*[4, 2])
+# G.add_edge(*[7, 2])
 
-print(G.edges)
+# print(G.edges)
 

@@ -319,6 +319,7 @@ def formTriClique(molGraph, SMILES, ssr):
     print("ghost_edge_list", ghost_edge_list)
 
     for edge in ghost_edge_list:
+        print('edge', edge)
         molGraph.add_edge(*tuple(edge), bondType=0.0)
 
     return molGraph, ring_pair_dictionary
@@ -476,7 +477,7 @@ def test():
 
 
     # SMILES = "O=C1[C@@H]2C=C[C@@H](C=CC2)C1(c1ccccc1)c1ccccc1"
-    SMILES = "C1CC2C=CC1CC=C2"
+    # SMILES = "C1CC2C=CC1CC=C2"
 
     # SMILES = "C1CCC2(CC1)CCCCC2" # basic spiro
     # SMILES = "C1CCC2CCCCC2C1" # basic fused
