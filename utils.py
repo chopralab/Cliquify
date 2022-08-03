@@ -90,6 +90,7 @@ def copy_node_attr(G, idx):
         "is_aromatic": G.nodes[idx]["is_aromatic"],
         "hybridization": G.nodes[idx]["hybridization"],
         "num_explicit_hs": G.nodes[idx]["num_explicit_hs"],
+        "map_num": G.nodes[idx]["map_num"],
     }
 
     return val

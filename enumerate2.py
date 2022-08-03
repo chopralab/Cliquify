@@ -1,4 +1,3 @@
-from matplotlib.pyplot import draw
 from rdkit import Chem
 import itertools
 import networkx as nx
@@ -19,6 +18,10 @@ def copy_atom(atom):
 def set_atommap(mol, num=0):
     for atom in mol.GetAtoms():
         atom.SetAtomMapNum(num)
+
+def set_atommap_graph(G, num=0):
+    for node in G.nodes():
+        G.nodes[node]["map_num"] = num
 
 def get_mol(smiles):
     mol = Chem.MolFromSmiles(smiles)
@@ -217,30 +220,22 @@ def attach_graphs(ctr_graph, neighbors, prev_nodes, nei_amap):
             if node not in amap:
                 node_attr = copy_node_attr(nei_graph, node)
                 amap[node] = len(ctr_graph.nodes)
+                # print(node_attr)
                 ctr_graph.add_node(len(ctr_graph.nodes), **node_attr)
 
-
-        if nei_graph.GetNumBonds() == 0:
+        if nei_graph.number_of_edges() == 0:
             nei_atom = nei_graph.nodes[0]
             ctr_atom = ctr_graph.nodes[amap[0]]
             ctr_graph.nodes[ctr_atom]["map_num"] = nei_graph.nodes[nei_atom]["map_num"]
         else:
-            # edit here next
-            for bond in nei_graph.GetBonds():
-                a1 = amap[bond.GetBeginAtom().GetIdx()]
-                a2 = amap[bond.GetEndAtom().GetIdx()] # get ctr_idx 
-                # print(a1, a2)
-                if ctr_mol.GetBondBetweenAtoms(a1, a2) is None:
-                    ctr_mol.AddBond(a1, a2, bond.GetBondType())
-                    #-----------------------------------------------
-                    new_bond = ctr_mol.GetBondBetweenAtoms(a1, a2)
-                    new_bond.SetBoolProp(KEY, bond.GetBoolProp(KEY))
+            for node1, node2, data in nei_graph.edges(data=True):
+                a1 = amap[node1]
+                a2 = amap[node2]
+                if not ctr_graph.has_edge(a1, a2):
+                    ctr_graph.add_edge(a1, a2, **data)
                 elif nei_id in prev_nids: #father node overrides
-                    ctr_mol.RemoveBond(a1, a2)
-                    ctr_mol.AddBond(a1, a2, bond.GetBondType())
-                    #------------------------------------------------
-                    new_bond = ctr_mol.GetBondBetweenAtoms(a1, a2)
-                    new_bond.SetBoolProp(KEY, bond.GetBoolProp(KEY))
+                    ctr_graph.remove_edge(a1, a2)
+                    ctr_graph.add_edge(a1, a2, **data)
 
     return ctr_graph
 
@@ -316,9 +311,36 @@ def enum_attach(ctr_mol, nei_node, amap, singletons):
 
     return att_confs
 
+import json
+class Graph:
+    def __init__(self, graph) -> None:
+        self.graph = graph
+    def __eq__(self, other):
+        if type(other) is type(self):
+            GM = iso.GraphMatcher(self.graph, other.graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
+            return GM.is_isomorphic()
+        else:
+            return False
+    def __hash__(self) -> int:
+        # return hash(nx.weisfeiler_lehman_graph_hash(self.graph,
+        #     edge_attr='color',
+        #     node_attr='map_num'))
+        # graph_data = []
+        # for attr in [""]
 
 
-def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
+        # edges_data = []
+        # for n1, n2, data in self.graph.edges.data():
+        #     data = json.dumps(data)
+        #     edges_data.append((n1, n2, data))
+
+        # nodes_data = []
+        # for n, data in self.graph.nodes.data():
+        #     data = json.dumps(data)
+        #     nodes_data.append((n, data))
+        # return hash((tuple(edges_data), tuple(nodes_data)))
+
+def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False):
     all_attach_confs = []
     singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.graph.number_of_nodes() == 1]
 
@@ -328,6 +350,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
     #     candidates = enum_assemble_singleton_tri(node)
     #     return candidates
 
+    cands_id = []
     def search(cur_amap, depth):
         if len(all_attach_confs) > MAX_NCAND:
             return
@@ -340,17 +363,43 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
         cand_amap = enum_attach(node.tri_mol, nei_node, cur_amap, singletons) # mol -> tri_mol
         # print('cand_amap', cand_amap)
         cand_smiles = set()
+        cand_graphs = set()
+        true_cand_graphs = []
         candidates = []
-        for amap in cand_amap:
+        for i, amap in enumerate(cand_amap):
             cand_mol = local_attach(node.tri_mol, neighbors[:depth+1], prev_nodes, amap) # mol -> tri_mol
 
-            GM = iso.GraphMatcher(node.label_G, mol_to_nx(cand_mol), node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
-            if not GM.subgraph_is_isomorphic(): continue
+            if print_out:
+                # draw_mol(mol_to_nx(cand_mol), 3000 + ((depth + 1) * 100) + i, ["map_num", "bond_type", "color"])
+                GM = iso.GraphMatcher(node.label_G, mol_to_nx(cand_mol), node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
+
+                # duplicated_graph = len([1 for G in true_cand_graphs if nx.is_isomorphic(node.label_G, mol_to_nx(cand_mol), node_match=node_equal_iso)])
+                # print(GM.is_isomorphic(), 
+                #         30000 + ((depth + 1) * 1000) + i, 
+                #         Chem.MolToSmiles(cand_mol), 
+                #         "graph", Graph(mol_to_nx(cand_mol)) in cand_graphs,  
+                #         "smiles", Chem.MolToSmiles(cand_mol) in cand_smiles,
+                #         "t_graph", bool(duplicated_graph))
+                print(GM.is_isomorphic(), Chem.MolToSmiles(cand_mol))
 
             smiles = Chem.MolToSmiles(cand_mol)
-            if smiles in cand_smiles:
+            # if smiles in cand_smiles and Graph(mol_to_nx(cand_mol)) in cand_graphs:
+            #     continue
+            if Graph(mol_to_nx(cand_mol)) in cand_graphs:
                 continue
+            # if smiles in cand_smiles:
+            #     continue
+            # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(node.label_G, mol_to_nx(cand_mol), node_match=node_equal_iso)])
+            # if duplicate: continue
+            
+
             cand_smiles.add(smiles)
+            cand_graphs.add(Graph(mol_to_nx(cand_mol)))
+
+            duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(node.label_G, mol_to_nx(cand_mol), node_match=node_equal_iso)])
+            if not duplicate: true_cand_graphs.append(mol_to_nx(cand_mol))
+            cands_id.append(3000 + ((depth + 1) * 100) + i)
+
             candidates.append(amap)
 
         if len(candidates) == 0:
@@ -360,7 +409,8 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
             search(new_amap, depth + 1)
 
     search(prev_amap, 0)
-    # print(all_attach_confs)
+
+    if print_out: print("cands_id", cands_id)
 
     cand_smiles = set()
     candidates = []
@@ -379,15 +429,15 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
 
     return candidates, candidates_G
 
+
+            
+
 #Only used for debugging purpose
 def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
     fa_nid = fa_node.nid if fa_node is not None else -1
     prev_nodes = [fa_node] if fa_node is not None else []
 
     children = [nei for nei in cur_node.neighbors if nei.nid != fa_nid]
-            
-    # for i, node in enumerate(children + [cur_node]):
-    #     draw_mol(mol_to_nx(node.tri_mol), 8000 + i)
 
     neighbors = [nei for nei in children if nei.graph.number_of_nodes() > 1]
     neighbors = sorted(neighbors, key=lambda x:x.graph.number_of_nodes(), reverse=True)
@@ -409,7 +459,16 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
         if GM.is_isomorphic(): 
             label_idx = i
             break
-    label_amap = cand_amap[label_idx]
+    try:
+        label_amap = cand_amap[label_idx]
+    except:
+        print("cur_node.nid", cur_node.nid)
+        draw_mol(cur_node.label_G, 1999, ["map_num", "bond_type", "color"])
+        enum_assemble(cur_node, neighbors, prev_nodes, cur_amap, print_out=True)
+
+        for i, cand_G in enumerate(cand_Gs):
+            draw_mol(cand_G, 2000 + i, ["map_num", "bond_type", "color"])
+            print(cand_smiles[i])
 
     for nei_id,ctr_atom,nei_atom in label_amap:
         if nei_id == fa_nid:
@@ -417,10 +476,11 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
         global_amap[nei_id][nei_atom] = global_amap[cur_node.nid][ctr_atom]
     
     # cur_mol = attach_mols(cur_mol, children, [], global_amap) #father is already attached
-    cur_graph = attach_mols(cur_graph, children, [], global_amap) #father is already attached
-    # for nei_node in children:
-    #     if not nei_node.is_leaf:
-    #         dfs_assemble(cur_mol, global_amap, label_amap, nei_node, cur_node)
+    cur_graph = attach_graphs(cur_graph, children, [], global_amap) #father is already attached
+
+    for nei_node in children:
+        if not nei_node.is_leaf:
+            dfs_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node)
 
 def get_subgraph(mol, cliques):
     mol = Chem.Mol(mol)
@@ -547,6 +607,7 @@ def main():
         if len(node.neighbors) > 1: #Leaf node mol is not marked
             set_atommap(node.mol, node.nid)
             set_atommap(node.tri_mol, node.nid)
+            set_atommap_graph(node.graph, node.nid)
         node.is_leaf = (len(node.neighbors) == 1)
 
     for node in list_of_nodes:
@@ -560,10 +621,13 @@ def main():
     root = list_of_nodes[1]
     # root = list_of_nodes[6]
     cur_graph = root.graph.copy()
-    global_amap = [{}] + [{} for node in list_of_nodes]
-    global_amap[1] = {node:node for node in cur_graph.nodes()}
+    global_amap = [{}] + [{} for node in list_of_nodes] # nid starts with 1, thus the first dict is not used, just as offset
+    global_amap[2] = {node:node for node in cur_graph.nodes()}
 
     dfs_assemble(cur_graph, global_amap, [], root, None)
+
+    draw_mol(cur_graph, 2000)
+    draw_mol(triangulated_graph, 2001)
 
 main()
 
