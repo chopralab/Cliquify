@@ -6,7 +6,6 @@ import itertools
 import networkx.algorithms.isomorphism as iso
 
 
-
 KEY = "gh"
 def mol_to_nx(mol, skip_unattached=False):
     G = nx.Graph()
@@ -73,6 +72,8 @@ def node_equal_iso(node1, node2):
     return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"] \
         and node1["map_num"] == node2["map_num"]
 
+def node_equal_iso2(node1, node2):
+    return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"]
 
 def ring_edge_equal_iso(edge1, edge2):
     return edge1["bond_type"] == edge2["bond_type"] and \
@@ -100,6 +101,7 @@ def node_equal(a1, a2):
 
 
 def ring_edge_equal(G1, G2, b1, b2, reverse=False):
+    # bond_prop = G1.get_edge_data(*b1)["ghost"] == G2.get_edge_data(*b2)["ghost"]
     bond_prop = G1.get_edge_data(*b1) == G2.get_edge_data(*b2)
     if reverse: b2 = b2[::-1]
 
@@ -126,6 +128,43 @@ def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color']):
     return
 
 
+def attach_graphs(ctr_graph, neighbors, prev_nodes, nei_amap):
+    prev_nids = [node.nid for node in prev_nodes]
+
+    # print()
+    # print(nei_amap)
+    # print("nei_nid : {nei_atom : ctr_atom }")
+    # print([nei_node.nid for nei_node in prev_nodes + neighbors])
+
+    for nei_node in prev_nodes + neighbors:
+        nei_id,nei_graph = nei_node.nid, nei_node.graph # mol -> tri_mol
+        
+        try: amap = nei_amap[nei_id]
+        except: continue
+        # amap = nei_amap[nei_id]
+        for node in nei_graph.nodes():
+            if node not in amap:
+                node_attr = copy_node_attr(nei_graph, node)
+                amap[node] = len(ctr_graph.nodes)
+                # print(node_attr)
+                ctr_graph.add_node(len(ctr_graph.nodes), **node_attr)
+
+        if nei_graph.number_of_edges() == 0:
+            nei_atom = nei_graph.nodes[0]
+            ctr_atom = ctr_graph.nodes[amap[0]]
+            ctr_graph.nodes[ctr_atom]["map_num"] = nei_graph.nodes[nei_atom]["map_num"]
+        else:
+            for node1, node2, data in nei_graph.edges(data=True):
+                a1 = amap[node1]
+                a2 = amap[node2]
+                if not ctr_graph.has_edge(a1, a2):
+                    ctr_graph.add_edge(a1, a2, **data)
+                elif nei_id in prev_nids: #father node overrides
+                    ctr_graph.remove_edge(a1, a2)
+                    ctr_graph.add_edge(a1, a2, **data)
+
+    return ctr_graph
+
 def local_attach_graph(cand_G, nei_G, amap):
     for node in nei_G.nodes():
         if node not in amap:
@@ -139,7 +178,9 @@ def local_attach_graph(cand_G, nei_G, amap):
         if not cand_G.has_edge(a1, a2):
             cand_G.add_edge(a1, a2, **data)
 
-def enum_attach_single_bond(ctr_G, nei_G):
+count = 0
+def enum_attach_single_bond(ctr_G, nei_node, prev_node):
+    nei_G = nei_node.graph
     cands_G = []
     for b1 in ctr_G.edges():
         b1_st, b1_ed = b1[0], b1[1]
@@ -150,20 +191,23 @@ def enum_attach_single_bond(ctr_G, nei_G):
                 cand_G = ctr_G.copy()
                 amap = {b2_st : b1_st, b2_ed: b1_ed}
                 local_attach_graph(cand_G, nei_G, amap)
+                # amap = {nei_node.nid : {b2_st : b1_st, b2_ed: b1_ed}}
+                # cand_G = attach_graphs(cand_G, [nei_node], [prev_node], amap)
 
-                # duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
-                # if not duplicate: cands_G.append(cand_G)
-                cands_G.append(cand_G)
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
+                if not duplicate: cands_G.append(cand_G)
+                # cands_G.append(cand_G)
 
-            elif ring_edge_equal(ctr_G, nei_G, b1, b2, reverse=True):
+            if ring_edge_equal(ctr_G, nei_G, b1, b2, reverse=True):
                 cand_G = ctr_G.copy()
                 amap = {b2_st : b1_ed, b2_ed: b1_st}
                 local_attach_graph(cand_G, nei_G, amap)
+                # amap = {nei_node.nid : {b2_st : b1_ed, b2_ed: b1_st}}
+                # cand_G = attach_graphs(cand_G, [nei_node], [prev_node], amap)
                 
-                # duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
-                # if not duplicate: cands_G.append(cand_G)
-                print("here")
-                cands_G.append(cand_G)
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
+                if not duplicate: cands_G.append(cand_G)
+                # cands_G.append(cand_G)
 
     return cands_G
                 
@@ -196,87 +240,18 @@ def enum_attach_double_bond(ctr_G, nei_G):
                 amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_left_node, nei_right_node: ctr_right_node}
                 local_attach_graph(cand_G, nei_G, amap)
 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
                 if not duplicate: cands_G.append(cand_G)
                 # cands_G.append(cand_G)
 
-            elif ring_edge_equal(ctr_G, nei_G, b1, b3, reverse=True) and ring_edge_equal(ctr_G, nei_G, b2, b4, reverse=True):
+            if ring_edge_equal(ctr_G, nei_G, b1, b3, reverse=True) and ring_edge_equal(ctr_G, nei_G, b2, b4, reverse=True):
                 cand_G = ctr_G.copy()
                 amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_right_node, nei_right_node: ctr_left_node}
                 local_attach_graph(cand_G, nei_G, amap)
 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
                 if not duplicate: cands_G.append(cand_G)
                 # cands_G.append(cand_G)
 
     return cands_G
-                
-def enum_assemble_singleton_tri(node):
 
-    neighbors = node.neighbors
-    possible_cands_G = []
-    cur_graph = neighbors[0].graph.copy()
-
-    def search(cur_graph, depth):
-        # print('current depth', depth)
-
-        if depth == len(neighbors):
-            possible_cands_G.append(cur_graph)
-            return
-
-        nei_node = neighbors[depth]
-        cands_G = enum_attach_single_bond(cur_graph, nei_node.graph)
-
-        if node.tri_mol.GetNumAtoms() == 1 and depth >= 2: # atom as singleton
-            cands_G.extend(enum_attach_double_bond(cur_graph, nei_node.graph))
-
-        if node.tri_mol.GetNumAtoms() == 2 and depth >= 3: # bond as singleton
-            cands_G.extend(enum_attach_double_bond(cur_graph, nei_node.graph))
-
-        # cands_G.extend(enum_attach_double_bond(cur_graph, nei_node.graph))
-
-        filtered_graph = []
-        for i, cand_G in enumerate(cands_G): # candidate tree pruning
-            node_adj = [True for node in cand_G.nodes() if len(list(cand_G.neighbors(node))) > 4]
-            if node_adj: continue
-
-            node_adj2 = [True for node in cand_G.nodes() if len(list(cand_G.neighbors(node))) == 2 and depth >= 3]
-            if len(node_adj2) > 2: continue
-
-            cand_ghost_edge = sum(nx.get_edge_attributes(cand_G, "ghost").values()) # sum of ghost edge
-            cur_ghost_edge = sum(nx.get_edge_attributes(cur_graph, "ghost").values()) # sum of ghost edge
-            nei_ghost_edge = sum(nx.get_edge_attributes(nei_node.graph, "ghost").values()) # sum of ghost edge
-            if (cand_ghost_edge < (cur_ghost_edge + nei_ghost_edge - 1)) or (cand_ghost_edge > (cur_ghost_edge + nei_ghost_edge)): continue
-                
-            filtered_graph.append(cand_G)
-        
-        if len(filtered_graph) == 0:
-            return
-        
-        for cand_G in filtered_graph:
-            search(cand_G, depth + 1)
-
-    search(cur_graph, 1)
-
-    print("candidates:", len(possible_cands_G))
-    print("\n")
-
-    draw_mol(node.label_G, 100000)
-    for i, cand_G in enumerate(possible_cands_G):
-        try: mol = nx_to_mol(cand_G)
-        except: continue
-
-        cand_smiles = Chem.MolToSmiles(mol)
-        # graph_match = nx.is_isomorphic(node.label_G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
-        GM = iso.GraphMatcher(node.label_G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
-        graph_match = GM.is_isomorphic()
-        smiles_match = node.label == cand_smiles
-        if smiles_match and graph_match:
-            print(cand_smiles)
-            print("smiles_match", smiles_match)
-            print("graph_match", graph_match)
-            print()
-            # draw_mol(cand_G, i)
-    raise
-
-    return possible_cands
