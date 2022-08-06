@@ -457,13 +457,14 @@ def enum_assemble_singleton_tri(node, prev_nodes, neighbors, prev_amap): # neigh
 def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False):
     all_attach_confs = []
     tri_mol_count = [nei.tri_mol.GetNumAtoms() for nei in node.neighbors]
-    singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.graph.number_of_nodes() == 1 or (len(node.neighbors) >= 3 and sum(tri_mol_count) >= 3 * len(tri_mol_count))]
+    singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.graph.number_of_nodes() == 1]
 
-    #------------------------ GET TO THIS AFTER ALL GRAPH CONV-----------------------------
-    if node.graph.number_of_nodes() <= 2 and len(node.neighbors) >= 3 and sum(tri_mol_count) >= 3 * len(tri_mol_count):
-        candidates = enum_assemble_singleton_tri(node, prev_nodes, neighbors, prev_amap)
-        return candidates
+    # #------------------------ GET TO THIS AFTER ALL GRAPH CONV-----------------------------
+    # if node.graph.number_of_nodes() <= 2 and len(node.neighbors) >= 3 and sum(tri_mol_count) >= 3 * len(tri_mol_count):
+    #     candidates = enum_assemble_singleton_tri(node, prev_nodes, neighbors, prev_amap)
+    #     return candidates
 
+    if print_out: print(len(neighbors))
     # cands_id = []
     def search(cur_amap, depth):
         if len(all_attach_confs) > MAX_NCAND:
@@ -481,6 +482,8 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
         candidates = []
         for i, amap in enumerate(cand_amap):
             # cand_mol = local_attach(node.tri_mol, neighbors[:depth+1], prev_nodes, amap) # mol -> tri_mol
+            # cand_graph = mol_to_nx(cand_mol)
+
             cand_graph = local_attach2(node.graph, neighbors[:depth+1], prev_nodes, amap) # graph alternative
 
             # smiles = Chem.MolToSmiles(cand_mol)
@@ -488,14 +491,14 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
             #     continue
             # cand_smiles.add(smiles)
 
-            if Graph(cand_graph) in cand_graphs:
-                continue
-            cand_graphs.add(Graph(cand_graph))
+            # if Graph(cand_graph) in cand_graphs:
+            #     continue
+            # cand_graphs.add(Graph(cand_graph))
 
-            # # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph)]) # less candidate due to less specific
-            # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
-            # if duplicate: continue
-            # true_cand_graphs.append(cand_graph)
+            # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph)]) # less candidate due to less specific
+            duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
+            if duplicate: continue
+            true_cand_graphs.append(cand_graph)
             
             # cands_id.append(3000 + ((depth + 1) * 100) + i)
 
@@ -528,8 +531,41 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
 
     return candidates, candidates_G
 
-# def enum_assemble_singleton_tri2(node, prev_nodes, neighbors, prev_amap): # neighbors exclude prev_nodes
+def enum_assemble_singleton_tri2(cur_graph, cur_node, neighbors, prev_nodes, temp_global_amap): # neighbors exclude prev_nodes
+    # cur_graph and cur_node.graph is a different thing, cur_graph indicates the dfs assembled up to this point
+    nid_graph = {nei.nid: nei.graph.copy() for nei in neighbors}
+    
+    cur_clique = list(temp_global_amap[cur_node.nid].values())
+    fa_clique = list(temp_global_amap[prev_nodes[0].nid].values())
+    label_starting_clique = set(cur_clique + fa_clique)
 
+    starting_graph = cur_graph.subgraph(label_starting_clique).copy()
+    possible_cands_G = []
+    possible_global_amap = []
+
+    def search(starting_graph, temp_global_amap, depth):
+
+        if depth == len(neighbors):
+            possible_cands_G.append(starting_graph)
+            possible_global_amap.append(temp_global_amap)
+            return
+
+        nei_node = neighbors[depth]
+        cands_G, cands_G_amap = enum_attach_double_bond2(starting_graph, nei_node, temp_global_amap)
+        # cands_G, cands_G_amap = enum_attach_single_bond(starting_graph, nei_node, temp_global_amap)
+
+
+
+
+
+
+        return
+
+    search(starting_graph, temp_global_amap, 0)
+    
+    candidates_amap = []
+
+    return candidates_amap
 
 
 #Only used for debugging purpose
@@ -567,8 +603,24 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
             label_idx = i
             break
     
-    label_amap = cand_amap[label_idx]
     print('num of cands:', len(cand_Gs))
+    try:
+        label_amap = cand_amap[label_idx]
+    except:
+        print('cur_node.nid2', cur_node.nid)
+        draw_mol(cur_node.label_G, 999, ["map_num", "bond_type", "color"], folder="next_cand")
+
+        # for i, cand_G in enumerate(cand_Gs):
+        #     GM = iso.GraphMatcher(cur_node.label_G, cand_G, node_match=node_equal_iso)
+        #     if GM.is_isomorphic():
+        #         print(1000 + i)
+        #         # draw_mol(cand_G, 1000 + i, ["map_num", "bond_type", "color"], folder="next_cand")
+
+        # for i, nei in enumerate([cur_node] + neighbors):
+        #     draw_mol(nei.graph, 50 + i, ["map_num", "bond_type", "color"], folder="next_cand")
+
+        cands, cands_G = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap, print_out=True)
+
 
     for nei_id,ctr_atom,nei_atom in label_amap:
         if nei_id == fa_nid:
@@ -577,10 +629,13 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
 
     if len(label_amap) == 0:
 
+        # temp_global_amap = [amap if i == cur_node.nid or i == fa_nid else {} for i, amap in enumerate(global_amap) ] # filter all those amap which are not part of cur_node and prev_node
+        # enum_assemble_singleton_tri2(cur_graph, cur_node, neighbors, prev_nodes, temp_global_amap)
+
+
         print([(child.clique, child.nid) for child in children])
         print()
         temp_global_amap = [amap if i == cur_node.nid or i == fa_nid else {} for i, amap in enumerate(global_amap) ]
-        global_amap[children[0].nid] = {node:node for node in children[0].graph.nodes()} # allow global amap for loop to feed value in from ctr_node/cur_node
         nid_graph = {child.nid: child.graph.copy() for child in children}
 
         cur_clique = list(global_amap[cur_node.nid].values())
@@ -797,7 +852,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
 
             GM = iso.GraphMatcher(cur_node.label_G, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
             GM2 = iso.GraphMatcher(cur_node.label_G, cands_G[i], node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
-            if GM.is_isomorphic(): 
+            if GM2.is_isomorphic(): 
                 # draw_mol(cand_graph, 5000 + i, ["map_num", "bond_type", "color"])
                 print(5000 + i, True, label_amap)
                 if i == 5: 
@@ -811,6 +866,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node):
         # ---------------------------FINAL---------------------------------------------------------
         print(total_label_amap)
         concat_label_amap = [label_amap for label_amap_list in total_label_amap for label_amap in label_amap_list]
+        global_amap[children[0].nid] = {node:node for node in children[0].graph.nodes()} # allow global amap for loop to feed value in from ctr_node/cur_node
         for nei_id,ctr_atom,nei_atom, ctr_id in concat_label_amap: # nei nid, atom idx, atom idx
             if nei_id == fa_nid: continue
 
@@ -917,6 +973,7 @@ def gen_mol2():
 def main():
     # ------------------------------------------------------------------------
     mol, cliques, molTreeEdges, triangulated_graph = gen_mol1()
+    # mol, cliques, molTreeEdges, triangulated_graph = gen_mol2()
 
 
     list_of_nodes = []
