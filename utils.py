@@ -4,6 +4,7 @@ from rdkit import Chem
 import matplotlib.pyplot as plt
 import itertools
 import networkx.algorithms.isomorphism as iso
+import copy
 
 
 KEY = "gh"
@@ -107,7 +108,7 @@ def ring_edge_equal(G1, G2, b1, b2, reverse=False):
 
     return node_equal(G1.nodes[b1[0]], G2.nodes[b2[0]]) and node_equal(G1.nodes[b1[1]], G2.nodes[b2[1]]) and bond_prop
 
-def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color']):
+def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color'], folder="subgraph"):
     plt.clf()
     symbol, bond_type, color = attr
 
@@ -121,14 +122,14 @@ def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color']):
     colors_cand_G = nx.get_edge_attributes(cand_G, color).values()
     nx.draw(cand_G, pos, node_color="yellow", with_labels=True, edge_color=colors_cand_G)
     # plt.show()
-    plt.savefig("subgraph/show{}.png".format(numb))
+    plt.savefig("{}/show{}.png".format(folder, numb))
     plt.clf()
 
 
     return
 
 
-def attach_graphs(ctr_graph, neighbors, prev_nodes, nei_amap):
+def attach_graphs(ctr_graph, neighbors, prev_nodes, nei_amap, print_out=False):
     prev_nids = [node.nid for node in prev_nodes]
 
     # print()
@@ -178,10 +179,27 @@ def local_attach_graph(cand_G, nei_G, amap):
         if not cand_G.has_edge(a1, a2):
             cand_G.add_edge(a1, a2, **data)
 
+def label_amap_formation(ctr_G, nei_node, amap, global_amap, print_out=False):
+    label_amap_G = []
+    for nei_atom, ctr_atom in amap.items():
+        nei_id = nei_node.nid
+        ctr_id = ctr_G.nodes[ctr_atom]["map_num"] 
+        if print_out: 
+            print(amap)
+            print((nei_id, ctr_atom, nei_atom, ctr_id))
+            print(global_amap[ctr_id], ctr_atom)
+            print(global_amap)
+            print()
+
+        ctr_atom = [fragment_idx for fragment_idx, full_graph_index in global_amap[ctr_id].items() if full_graph_index == ctr_atom ].pop()
+        label_amap_G.append((nei_id, ctr_atom, nei_atom, ctr_id))
+    return label_amap_G
+
 count = 0
-def enum_attach_single_bond(ctr_G, nei_node, prev_node):
+def enum_attach_single_bond(ctr_G, nei_node, global_amap):
     nei_G = nei_node.graph
     cands_G = []
+    cands_G_amap = []
     for b1 in ctr_G.edges():
         b1_st, b1_ed = b1[0], b1[1]
         for b2 in nei_G.edges():
@@ -189,29 +207,37 @@ def enum_attach_single_bond(ctr_G, nei_node, prev_node):
 
             if ring_edge_equal(ctr_G, nei_G, b1, b2):
                 cand_G = ctr_G.copy()
-                amap = {b2_st : b1_st, b2_ed: b1_ed}
-                local_attach_graph(cand_G, nei_G, amap)
-                # amap = {nei_node.nid : {b2_st : b1_st, b2_ed: b1_ed}}
-                # cand_G = attach_graphs(cand_G, [nei_node], [prev_node], amap)
+                cand_global_amap = copy.deepcopy(global_amap)
 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
-                if not duplicate: cands_G.append(cand_G)
+                amap = {b2_st : b1_st, b2_ed: b1_ed}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
+                local_attach_graph(cand_G, nei_G, amap)
+
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
                 # cands_G.append(cand_G)
 
             if ring_edge_equal(ctr_G, nei_G, b1, b2, reverse=True):
                 cand_G = ctr_G.copy()
+                cand_global_amap = copy.deepcopy(global_amap)
+
                 amap = {b2_st : b1_ed, b2_ed: b1_st}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
                 local_attach_graph(cand_G, nei_G, amap)
-                # amap = {nei_node.nid : {b2_st : b1_ed, b2_ed: b1_st}}
-                # cand_G = attach_graphs(cand_G, [nei_node], [prev_node], amap)
                 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
-                if not duplicate: cands_G.append(cand_G)
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
                 # cands_G.append(cand_G)
 
-    return cands_G
+    return cands_G, cands_G_amap
                 
-def enum_attach_double_bond(ctr_G, nei_G):
+def enum_attach_double_bond(ctr_G, nei_node, global_amap):
+    nei_G = nei_node.graph
+
     ctr_pair_bonds = []
     for node in ctr_G.nodes():
         nei_n_ctr = [(nei, node) for nei in ctr_G.neighbors(node)]
@@ -225,6 +251,7 @@ def enum_attach_double_bond(ctr_G, nei_G):
         nei_pair_bonds.extend(subset_possible_bonds)
 
     cands_G = []
+    cands_G_amap = []
     for b1, b2 in ctr_pair_bonds:
         ctr_ctr_node = list(set(b1).intersection(set(b2)))[0]
         ctr_left_node = list(set(b1) - set(b1).intersection(set(b2)))[0]
@@ -237,21 +264,88 @@ def enum_attach_double_bond(ctr_G, nei_G):
     
             if ring_edge_equal(ctr_G, nei_G, b1, b3) and ring_edge_equal(ctr_G, nei_G, b2, b4):
                 cand_G = ctr_G.copy()
+                cand_global_amap = copy.deepcopy(global_amap)
+
                 amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_left_node, nei_right_node: ctr_right_node}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
                 local_attach_graph(cand_G, nei_G, amap)
 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
-                if not duplicate: cands_G.append(cand_G)
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
                 # cands_G.append(cand_G)
 
             if ring_edge_equal(ctr_G, nei_G, b1, b3, reverse=True) and ring_edge_equal(ctr_G, nei_G, b2, b4, reverse=True):
                 cand_G = ctr_G.copy()
+                cand_global_amap = copy.deepcopy(global_amap)
+
                 amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_right_node, nei_right_node: ctr_left_node}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
                 local_attach_graph(cand_G, nei_G, amap)
 
-                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)])
-                if not duplicate: cands_G.append(cand_G)
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
                 # cands_G.append(cand_G)
 
-    return cands_G
+    return cands_G, cands_G_amap
+
+def enum_attach_double_bond2(ctr_G, nei_node, global_amap):
+    nei_G = nei_node.graph
+
+    ctr_pair_bonds = []
+    for node in ctr_G.nodes():
+        nei_n_ctr = [(nei, node) for nei in ctr_G.neighbors(node)]
+        subset_possible_bonds = list(itertools.combinations(nei_n_ctr, 2))
+        ctr_pair_bonds.extend(subset_possible_bonds)
+
+    nei_pair_bonds = []
+    for node in nei_G.nodes():
+        nei_n_ctr = [(nei, node) for nei in nei_G.neighbors(node)]
+        subset_possible_bonds = list(itertools.combinations(nei_n_ctr, 2))
+        nei_pair_bonds.extend(subset_possible_bonds)
+
+    cands_G = []
+    cands_G_amap = []
+    for b1, b2 in ctr_pair_bonds:
+        ctr_ctr_node = list(set(b1).intersection(set(b2)))[0]
+        ctr_left_node = list(set(b1) - set(b1).intersection(set(b2)))[0]
+        ctr_right_node = list(set(b2) - set(b1).intersection(set(b2)))[0]
+        
+        for b3, b4 in nei_pair_bonds:
+            nei_ctr_node = list(set(b3).intersection(set(b4)))[0]
+            nei_left_node = list(set(b3) - set(b3).intersection(set(b4)))[0]
+            nei_right_node = list(set(b4) - set(b3).intersection(set(b4)))[0]
+                
+            if ring_edge_equal(ctr_G, nei_G, (ctr_left_node, ctr_ctr_node), (nei_left_node, nei_ctr_node)) and ring_edge_equal(ctr_G, nei_G, (ctr_ctr_node, ctr_right_node), (nei_ctr_node, nei_right_node)):
+                cand_G = ctr_G.copy()
+                cand_global_amap = copy.deepcopy(global_amap)
+
+                amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_left_node, nei_right_node: ctr_right_node}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
+                local_attach_graph(cand_G, nei_G, amap)
+
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
+
+            if ring_edge_equal(ctr_G, nei_G, (ctr_right_node, ctr_ctr_node), (nei_left_node, nei_ctr_node)) and ring_edge_equal(ctr_G, nei_G, (ctr_ctr_node, ctr_left_node), (nei_ctr_node, nei_right_node)):
+            # if ring_edge_equal(ctr_G, nei_G, b1, b3, reverse=True) and ring_edge_equal(ctr_G, nei_G, b2, b4):
+                cand_G = ctr_G.copy()
+                cand_global_amap = copy.deepcopy(global_amap)
+
+                amap = {nei_ctr_node : ctr_ctr_node, nei_left_node: ctr_right_node, nei_right_node: ctr_left_node}
+                label_amap_G = label_amap_formation(ctr_G, nei_node, amap, cand_global_amap)
+                local_attach_graph(cand_G, nei_G, amap)
+
+                duplicate = len([1 for G in cands_G if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)])
+                if not duplicate: 
+                    cands_G.append(cand_G)
+                    cands_G_amap.append(label_amap_G) #, print(label_amap_G)
+        # print("-----------------------------------------------------")
+
+    return cands_G, cands_G_amap
 
