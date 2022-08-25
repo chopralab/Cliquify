@@ -4,13 +4,23 @@ from rdkit import Chem
 import matplotlib.pyplot as plt
 import itertools
 import networkx.algorithms.isomorphism as iso
+from rdkit.Chem import AllChem
+from rdkit.Chem import rdDepictor
 import copy
 
 
-KEY = "gh"
+KEY = "ghost"
 def mol_to_nx(mol, skip_unattached=False):
     G = nx.Graph()
 
+    for bond in mol.GetBonds():
+        try: bond.GetBoolProp(KEY)
+        except: bond.SetBoolProp(KEY, False)
+
+    # if not mol.GetNumConformers():
+    #     rdDepictor.Compute2DCoords(mol)
+    # conf = mol.GetConformer()
+    # Chem.WedgeMolBonds(mol,conf)
 
     for atom in mol.GetAtoms():
         if skip_unattached and not atom.GetNeighbors(): continue
@@ -26,6 +36,7 @@ def mol_to_nx(mol, skip_unattached=False):
         G.add_edge(bond.GetBeginAtomIdx(),
                    bond.GetEndAtomIdx(),
                    bond_type=bond.GetBondType(),
+                   bond_dir=bond.GetBondDir(),
                    ghost=bond.GetBoolProp(KEY),
                    color='r' if bond.GetBoolProp(KEY) else 'b',
                    )
@@ -33,6 +44,7 @@ def mol_to_nx(mol, skip_unattached=False):
 
 def nx_to_mol(G):
     mol = Chem.RWMol()
+    # Chem.rdDepictor.Compute2DCoords(mol)
     atomic_nums = nx.get_node_attributes(G, 'symbol')
     chiral_tags = nx.get_node_attributes(G, 'chiral_tag')
     formal_charges = nx.get_node_attributes(G, 'formal_charge')
@@ -42,6 +54,7 @@ def nx_to_mol(G):
     map_nums = nx.get_node_attributes(G, 'map_num')
     node_to_idx = {}
     for node in G.nodes():
+        # print(node, atomic_nums[node], num_explicit_hss[node], node_is_aromatics[node])
         a=Chem.Atom(atomic_nums[node])
         a.SetChiralTag(chiral_tags[node])
         a.SetFormalCharge(formal_charges[node])
@@ -52,18 +65,29 @@ def nx_to_mol(G):
         idx = mol.AddAtom(a)
         node_to_idx[node] = idx
 
+    
+    # mol.UpdatePropertyCache()
     bond_types = nx.get_edge_attributes(G, 'bond_type')
     ghost = nx.get_edge_attributes(G, 'ghost')
+    bond_dir = nx.get_edge_attributes(G, 'bond_dir')
     for edge in G.edges():
         first, second = edge
         ifirst = node_to_idx[first]
         isecond = node_to_idx[second]
         bond_type = bond_types[first, second]
+
+        # print(bond_type, first, second) 
         mol.AddBond(ifirst, isecond, bond_type)
         new_bond = mol.GetBondBetweenAtoms(ifirst, isecond)
         new_bond.SetBoolProp(KEY, ghost[first, second])
+        # new_bond.SetBondDir(bond_dir[first, second])
+        # if new_bond.GetBondDir() != Chem.BondDir.NONE: print(new_bond.GetBondDir())
         
-    try: Chem.SanitizeMol(mol)
+    # Chem.AssignStereochemistry(mol, force=True, cleanIt=True)
+    print(node_to_idx)
+    try: 
+        Chem.SanitizeMol(mol)
+        # Chem.rdmolops.AssignChiralTypesFromBondDirs(mol)
     except: pass
     return mol
 
@@ -71,7 +95,8 @@ def nx_to_mol(G):
 
 def node_equal_iso(node1, node2):
     return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"] \
-        and node1["map_num"] == node2["map_num"]
+        and node1["map_num"] == node2["map_num"] and node1["is_aromatic"] == node2["is_aromatic"] \
+            and node1["num_explicit_hs"] == node2["num_explicit_hs"]
 
 def node_equal_iso2(node1, node2):
     return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"]
@@ -102,8 +127,8 @@ def node_equal(a1, a2):
 
 
 def ring_edge_equal(G1, G2, b1, b2, reverse=False):
-    # bond_prop = G1.get_edge_data(*b1)["ghost"] == G2.get_edge_data(*b2)["ghost"]
-    bond_prop = G1.get_edge_data(*b1) == G2.get_edge_data(*b2)
+    bond_prop = G1.get_edge_data(*b1)["ghost"] == G2.get_edge_data(*b2)["ghost"]
+    # bond_prop = G1.get_edge_data(*b1) == G2.get_edge_data(*b2)
     if reverse: b2 = b2[::-1]
 
     return node_equal(G1.nodes[b1[0]], G2.nodes[b2[0]]) and node_equal(G1.nodes[b1[1]], G2.nodes[b2[1]]) and bond_prop
