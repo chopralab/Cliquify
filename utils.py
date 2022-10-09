@@ -84,7 +84,6 @@ def nx_to_mol(G):
         # if new_bond.GetBondDir() != Chem.BondDir.NONE: print(new_bond.GetBondDir())
         
     # Chem.AssignStereochemistry(mol, force=True, cleanIt=True)
-    print(node_to_idx)
     try: 
         Chem.SanitizeMol(mol)
         # Chem.rdmolops.AssignChiralTypesFromBondDirs(mol)
@@ -98,8 +97,12 @@ def node_equal_iso(node1, node2):
         and node1["map_num"] == node2["map_num"] and node1["is_aromatic"] == node2["is_aromatic"] \
             and node1["num_explicit_hs"] == node2["num_explicit_hs"]
 
-def node_equal_iso2(node1, node2):
-    return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"]
+def node_equal_iso2(node1, node2): # honeycomb
+    return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"] \
+
+def node_equal_iso3(node1, node2):
+    return node1["symbol"] == node2["symbol"] and node1["formal_charge"] == node2["formal_charge"] \
+        and node1["map_num"] == node2["map_num"] \
 
 def ring_edge_equal_iso(edge1, edge2):
     return edge1["bond_type"] == edge2["bond_type"] and \
@@ -401,4 +404,3 @@ def enum_attach_double_bond2(ctr_G, nei_node, global_amap):
         # print("-----------------------------------------------------")
 
     return cands_G, cands_G_amap
-

@@ -55,18 +55,19 @@ def debug_singleton_3nei(cur_graph, cur_node, children, prev_nodes, fa_nid, glob
         # validate_graph = cand_graph.copy()
         # validate_graph.remove_nodes_from(non_label_node)
 
-        GM = iso.GraphMatcher(cur_node.label_G, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+        GM = iso.GraphMatcher(cur_node.label_G, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso2)
         GM2 = iso.GraphMatcher(cur_node.label_G, cands_G[i], node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
         if GM.subgraph_is_isomorphic(): 
         # if (GM.subgraph_is_isomorphic() and GM2.subgraph_is_isomorphic()) or GM2.subgraph_is_isomorphic(): 
             # draw_mol(cands_G[i], 1000 + i, ["map_num", "bond_type", "color"], folder="extension")
             # draw_mol(cand_graph, 1000 + i, ["map_num", "bond_type", "color"], folder="extension")
-            # print(1000 + i, True, label_amap)
+            print(1000 + i, True, label_amap)
             print(temp_global_amap)
         else:
             print(1000 + i, False)
             draw_mol(cand_graph, 1000 + i, ["map_num", "bond_type", "color"], folder="extension")
-            if i == 1: 
+            if i == 0:
+                print(1000 + i, True)
                 total_label_amap.append(label_amap)
                 chosen_amap = copy.deepcopy(temp_global_amap)
                 chosen_graph = cand_graph.copy()
@@ -115,7 +116,7 @@ def debug_singleton_3nei(cur_graph, cur_node, children, prev_nodes, fa_nid, glob
             print(temp_global_amap)
         else:
             print(2000 + i, False, label_amap)
-            # draw_mol(cand_graph, 2000 + i, ["map_num", "bond_type", "color"], folder="extension")
+            draw_mol(cand_graph, 2000 + i, ["map_num", "bond_type", "color"], folder="extension")
             # if i == 3: 
             #     total_label_amap.append(label_amap)
             #     chosen_amap = copy.deepcopy(temp_global_amap)

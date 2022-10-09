@@ -30,11 +30,14 @@ def tree_decomp(mol):
     # ssr = sorted([sorted(list(x)) for x in Chem.GetSymmSSSR(mol)])
     # print(ssr)
     cliques = []
+    non_ring_nodes = set()
     for bond in mol.GetBonds():
         a1 = bond.GetBeginAtom().GetIdx()
         a2 = bond.GetEndAtom().GetIdx()
         if not bond.IsInRing():
             cliques.append([a1,a2])
+            non_ring_nodes.add(a1)
+            non_ring_nodes.add(a2)
 
     ssr_list = nx.cycle_basis(graph)
 
@@ -64,6 +67,7 @@ def tree_decomp(mol):
                     # combine two rings together and get their set of atoms, this would result in the bridge compound itself
                     cliques[j] = [] # will be cleared later
   
+
     ssr_dict = {}
     chosen_sele = set()
     for ring1 in ssr_list:
@@ -76,9 +80,17 @@ def tree_decomp(mol):
             if len(inter) > 0 and inter not in intersect_list:
                 intersect_list.append(inter)
         
-        if not intersect_list:
+        if not intersect_list: 
             ssr_dict[tuple(ring1)] = ring1[0]
         elif len(intersect_list) == 1:
+
+            # # [OPTIONAL] increase deterministic of ortho, meta, para attachment
+            # non_ring_nodes = set(ring1) & non_ring_nodes
+            # if non_ring_nodes:
+            #     non_ring_nei = set(graph.neighbors(non_ring_nodes.pop())) & set(ring1)
+            #     ssr_dict[tuple(ring1)] = non_ring_nei.pop()
+            #     continue
+            
             # spiro
             inter_atoms = list(intersect_list[0])
             if len(inter_atoms) == 1:
@@ -87,8 +99,8 @@ def tree_decomp(mol):
             else: # fused
                 ssr_dict[tuple(ring1)] = inter_atoms[0] # choose intersect atoms
         else:
-            # honeycomb structure
             # print(ring1, intersect_list)
+
             inter_comb = list(itertools.combinations(intersect_list, 2))
             inter_atoms = set() # intersection between ring intersection 
             union_inter = set()
@@ -97,13 +109,22 @@ def tree_decomp(mol):
                 union_inter.update(comb[0])
                 union_inter.update(comb[1])
 
-            avail_sele = (union_inter - chosen_sele) - inter_atoms
-            if not avail_sele: 
-                ssr_dict[tuple(ring1)] = list(union_inter - inter_atoms).pop()
-                continue
-            seleNode = list(avail_sele).pop()
-            chosen_sele.add(seleNode)
-            ssr_dict[tuple(ring1)] = seleNode
+            if inter_atoms:
+                # honeycomb structure
+                avail_sele = (union_inter - chosen_sele) - inter_atoms
+                if not avail_sele: 
+                    ssr_dict[tuple(ring1)] = list(union_inter - inter_atoms).pop()
+                    continue
+                
+                for inter in intersect_list:
+                    if avail_sele & inter and inter_atoms & inter:
+                        seleNode = inter - inter_atoms
+                        ssr_dict[tuple(ring1)] = seleNode.pop()
+                        break
+            else:
+                # non honeycomb
+                ssr_dict[tuple(ring1)] = union_inter.pop()
+        
 
     original_graph = graph.copy()
     for ring, seleNode in ssr_dict.items():
@@ -119,12 +140,11 @@ def tree_decomp(mol):
         basis = nx.cycle_basis(temp_graph)
         cliques.extend(basis)
 
-    # print(cliques)
     # draw_mol(graph, 2, folder="tree_decomp_img")
 
 
     # ---------------------------------------------------------------------
-    cliques = [c for c in cliques if len(c) > 0]
+    cliques = [c for c in cliques if len(c) > 0] # triangulated cliques
     nei_list = [[] for i in range(n_atoms)]
     nei_list2 = [[] for i in range(n_atoms)]
     for i in range(len(cliques)):
@@ -132,13 +152,13 @@ def tree_decomp(mol):
             nei_list[atom].append(i)
             nei_list2[atom].append((cliques[i]))
     
-    original_cliques = [c for c in original_cliques if len(c) > 0]
+    original_cliques = [c for c in original_cliques if len(c) > 0] # before triangulation cliques
     # print('ori cliques', original_cliques)
     original_nei_list = [[] for i in range(n_atoms)]
     for i in range(len(original_cliques)):
         for atom in original_cliques[i]:
             original_nei_list[atom].append(i)
-    
+
     #Build edges and add singleton cliques
     edges = defaultdict(int)
     for atom in range(n_atoms):
@@ -151,14 +171,16 @@ def tree_decomp(mol):
         rings = [c for c in original_cnei if len(original_cliques[c]) >= 3]
         # rings = [c for c in cnei if len(cliques[c]) > 4]
         # print('rings', rings, 'cnei', cnei2, 'atom', atom)
-        if len(bonds) > 2 or (len(bonds) == 2 and len(original_cnei) > 2): #In general, if len(cnei) >= 3, a singleton should be added, but 1 bond + 2 ring is currently not dealt with.
-            # print('in here atom1', atom)   
+        if len(bonds) > 2:
+        # if len(bonds) > 2 or (len(bonds) == 2 and len(original_cnei) > 2): #In general, if len(cnei) >= 3, a singleton should be added, but 1 bond + 2 ring is currently not dealt with.
             cliques.append([atom])
             c2 = len(cliques) - 1
             for c1 in cnei:
                 edges[(c1,c2)] = 1
         elif len(rings) > 2: #Multiple (n>2) complex rings
-            # print('in here atom2', atom)      
+            # print('in here atom2', atom)
+            if len(graph[atom]) > 3: continue # 3 triangles but not all connected
+
             second_node = None
             neis = original_graph.neighbors(atom)
             for nei in neis:
