@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
-from utils import *
+from Cliquify.utils import *
 import networkx as nx
 import copy
 
@@ -25,7 +25,6 @@ def tree_decomp(mol):
     n_atoms = mol.GetNumAtoms()
     for bond in mol.GetBonds(): bond.SetBoolProp(KEY, False)
     graph = mol_to_nx(mol)
-    draw_mol(graph, 1, folder="tree_decomp_img")
 
     # ssr = sorted([sorted(list(x)) for x in Chem.GetSymmSSSR(mol)])
     # print(ssr)
@@ -84,12 +83,12 @@ def tree_decomp(mol):
             ssr_dict[tuple(ring1)] = ring1[0]
         elif len(intersect_list) == 1:
 
-            # # [OPTIONAL] increase deterministic of ortho, meta, para attachment
-            # non_ring_nodes = set(ring1) & non_ring_nodes
-            # if non_ring_nodes:
-            #     non_ring_nei = set(graph.neighbors(non_ring_nodes.pop())) & set(ring1)
-            #     ssr_dict[tuple(ring1)] = non_ring_nei.pop()
-            #     continue
+            # [OPTIONAL] increase deterministic of ortho, meta, para attachment
+            non_ring_nodes = set(ring1) & non_ring_nodes
+            if non_ring_nodes:
+                non_ring_nei = set(graph.neighbors(non_ring_nodes.pop())) & set(ring1)
+                ssr_dict[tuple(ring1)] = non_ring_nei.pop()
+                continue
             
             # spiro
             inter_atoms = list(intersect_list[0])

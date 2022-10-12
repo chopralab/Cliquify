@@ -1,11 +1,11 @@
 from rdkit import Chem
 import itertools
 import networkx as nx
-from utils import *
+from Cliquify.utils import *
 import networkx.algorithms.isomorphism as iso
-from debug_script import *
+from Cliquify.debug_script import *
 from rdkit import RDLogger
-from tree_decomposition2 import tree_decomp
+from Cliquify.tree_decomposition2 import tree_decomp
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 import copy
@@ -1139,6 +1139,6 @@ def main():
     # draw_mol(triangulated_graph, 700001, ['map_num', 'bond_type', 'color'])
 
 
-main()
+# main()
 
 

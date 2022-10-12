@@ -1,11 +1,12 @@
+
 from rdkit import Chem
 import itertools
 import networkx as nx
-from utils import *
+from Cliquify.utils import *
 import networkx.algorithms.isomorphism as iso
-from debug_script import *
+from Cliquify.debug_script import *
 from rdkit import RDLogger
-from tree_decomposition2 import tree_decomp
+from Cliquify.tree_decomposition2 import tree_decomp
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 import copy
@@ -643,7 +644,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
     try:
         label_amap = cand_amap[label_idx]
     except:
-        print('cur_node.nid2', cur_node.nid)
+        # print('cur_node.nid2', cur_node.nid)
         # draw_mol(cur_graph, 6000 + count, ["map_num", "bond_type", "color"], folder="cur_graph")
 
         # draw_mol(cur_node.label_G, 999, ["map_num", "bond_type", "color"], folder="next_cand", label="label_G")
@@ -651,12 +652,12 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
         for i, smiles in enumerate(cand_smiles):
             if smiles == gold_smiles:
                 label_idx = i
-                print('here1', i)
+                # print('here1', i)
                 break
-            print(smiles)
-            print(gold_smiles)
-            print()     
-        raise     
+            # print(smiles)
+            # print(gold_smiles)
+            # print()     
+        # raise     
     
     try:
         label_amap = cand_amap[label_idx]
@@ -664,7 +665,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
         for i, cand_G in enumerate(cand_Gs):
             GM = iso.GraphMatcher(cur_node.label_G, cand_G, node_match=node_equal_iso)
             if GM.is_isomorphic():
-                print('here2', i)
+                # print('here2', i)
                 label_idx = i
                 break
         if not label_idx: return
@@ -726,6 +727,60 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
             if not nei_node.is_leaf:
                 dfs_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node)
 
+def node_labelling(mol, cliques, molTreeEdges, triangulated_graph):
+
+    list_of_nodes = []
+    for i, clique in enumerate(cliques):
+        if isinstance(clique, tuple):
+            c = list(clique)
+            m = MolTreeNode(mol, c)
+        list_of_nodes.append(m)
+
+    for x,y in molTreeEdges:
+        list_of_nodes[x].add_neighbor(list_of_nodes[y])
+        list_of_nodes[y].add_neighbor(list_of_nodes[x])
+
+    for i,node in enumerate(list_of_nodes):
+        node.nid = i + 1
+        if len(node.neighbors) > 1: #Leaf node mol is not marked
+            set_atommap(node.mol, node.nid)
+            set_atommap(node.tri_mol, node.nid)
+            set_atommap_graph(node.graph, node.nid)
+        node.is_leaf = (len(node.neighbors) == 1)
+
+
+    for node in list_of_nodes:
+        node.recover_G(triangulated_graph.copy())
+
+    root_idx = 0
+    root = list_of_nodes[root_idx]
+    cur_graph = root.graph.copy()
+    global_amap = [{}] + [{} for node in list_of_nodes] # nid starts with 1, thus the first dict is not used, just as offset
+    global_amap[root_idx+1] = {node:node for node in cur_graph.nodes()}
+
+    return root, cur_graph, global_amap
+
+
+def remove_edges_reset_idx(cur_graph):
+    final_graph = cur_graph.copy()
+    for a1, a2, data in cur_graph.edges(data=True):
+        if data.get(KEY): final_graph.remove_edge(a1, a2)
+
+    set_atommap_graph(final_graph)
+
+    return final_graph
+def reconstruction_evaluation(chosen_smiles, final_graph):
+    cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
+
+    chosen_graph = mol_to_nx(Chem.MolFromSmiles(chosen_smiles))
+    graph_match = nx.is_isomorphic(final_graph, chosen_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+
+
+    gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
+    dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
+
+    return gold_smiles, dec_smiles, graph_match
+    
 def add_ghost_edges(G, ghost_edges):
 
     for edge in ghost_edges:
@@ -747,7 +802,7 @@ def main():
     for count, chosen_smiles in enumerate(smiles):
         # if count < 22400: continue
         # # if count % 200 == 0: print("over: ", count)
-        chosen_smiles = smiles[555]
+        chosen_smiles = smiles[425]
 
         # chosen_smiles = smiles[600]
 
@@ -762,7 +817,9 @@ def main():
                     m = MolTreeNode(mol, c)
                 list_of_nodes.append(m)
         except:
-            print("fail_decompose:", count)
+            with open("fail_mol_list.txt", "a") as myfile:
+                gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
+                myfile.writelines("{},{},Decompose\n".format(gold_smiles, count))
             continue
 
         for x,y in molTreeEdges:
@@ -836,12 +893,12 @@ def main():
             #     myfile.writelines("\n")
 
             with open("fail_mol_list.txt", "a") as myfile:
-                myfile.writelines("{},{}\n".format(gold_smiles, count))
+                myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, count))
 
             # print(get_smiles(set_atommap(cur_mol)))
             # draw_mol(triangulated_graph, 700001, ['map_num', 'bond_type', 'color'])
 
-
-main()
+if __name__ == "__main__":
+    main()
 
 
