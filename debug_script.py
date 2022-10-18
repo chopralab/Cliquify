@@ -1,5 +1,6 @@
       
-from Cliquify.utils import *
+# from Cliquify.utils import *
+from utils import *
 
 def debug_singleton_3nei(cur_graph, cur_node, children, prev_nodes, fa_nid, global_amap):
 

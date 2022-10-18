@@ -5,13 +5,18 @@ import concurrent.futures
 import networkx as nx
 import multiprocessing
 
-from Cliquify.enumerate3 import dfs_assemble, node_labelling, remove_edges_reset_idx, reconstruction_evaluation
-from Cliquify.tree_decomposition2 import tree_decomp
-from Cliquify.utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
+# from Cliquify.enumerate3 import dfs_assemble, node_labelling, remove_edges_reset_idx, reconstruction_evaluation
+# from Cliquify.tree_decomposition2 import tree_decomp
+# from Cliquify.utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
+from enumerate3 import dfs_assemble, node_labelling, remove_edges_reset_idx, reconstruction_evaluation
+from tree_decomposition2 import tree_decomp
+from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
 
 # with open("C:\\Users\\fongm\\Downloads\\icml18-jtnn\\data\\zinc\\all.txt") as f:
 #     smiles_list = f.readlines()
-with open("zinc\\all.txt") as f:
+# with open("zinc\\all.txt") as f:
+#     smiles_list = f.readlines()
+with open("../zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 
@@ -27,7 +32,9 @@ def decompose_reconstruct(idx):
     except:
         gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
         print(gold_smiles, "fail_deconstruct")
-        with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
+        # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
+        #     myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
+        with open("fail_mol_list.txt", "a") as myfile:
             myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
         return
     
@@ -38,7 +45,9 @@ def decompose_reconstruct(idx):
     
     if gold_smiles != dec_smiles or not graph_match:
         print(gold_smiles, "fail_reconstruct")
-        with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
+        # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
+        #     myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
+        with open("fail_mol_list.txt", "a") as myfile:
             myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
     
     return

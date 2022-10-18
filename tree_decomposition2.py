@@ -4,7 +4,8 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
-from Cliquify.utils import *
+# from Cliquify.utils import *
+from utils import *
 import networkx as nx
 import copy
 
