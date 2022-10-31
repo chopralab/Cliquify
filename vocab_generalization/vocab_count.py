@@ -7,6 +7,7 @@ import multiprocessing
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 from enumerate3 import get_fragments
@@ -26,6 +27,7 @@ def vocab_count(idx):
 
     for i, clique in enumerate(cliques):
         if isinstance(clique, tuple):
+            if len(clique) > 4: continue
             fragment_smiles = get_fragments(mol, clique)
             total_vocab.add(fragment_smiles)
 
@@ -42,6 +44,6 @@ total_vocab = list(total_vocab)
 print()
 print("total_vocab", len(total_vocab))
 
-with open("vocab.txt", "a") as myfile:
+with open("vocab2.txt", "a") as myfile:
     for vocab in total_vocab:       
         myfile.writelines("{}\n".format(vocab))

@@ -22,11 +22,21 @@ def count_honeycomb(idx):
     honeycomb_graph = mol_to_nx(Chem.MolFromSmiles("C1CC2CCCC3CCCC(C1)C23"))
     honeycomb_graph2 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCCC3CCC(C1)C23"))
     honeycomb_graph3 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCC3CCCC4CCC(C1)C2C34"))
+    honeycomb_graph4 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCC3CCC4CCCC5CC(C1)C2C3C45"))
+    honeycomb_graph4 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCC3CCC4CCCC5CC(C1)C2C3C45"))
+    honeycomb_graph5 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCCC3CCC(C1)C23"))
+    honeycomb_graph6 = mol_to_nx(Chem.MolFromSmiles("C1CC2CCC3CCC4CCC(C1)C2C34"))
+
+
     GM = iso.GraphMatcher(graph, honeycomb_graph)
     GM2 = iso.GraphMatcher(graph, honeycomb_graph2)
     GM3 = iso.GraphMatcher(graph, honeycomb_graph3)
-    if GM.subgraph_is_isomorphic() or GM2.subgraph_is_isomorphic() or GM3.subgraph_is_isomorphic():
-        with open("honeycomb_structure.txt", "a") as myfile:
+    GM4 = iso.GraphMatcher(graph, honeycomb_graph4)
+    GM5 = iso.GraphMatcher(graph, honeycomb_graph5)
+    GM6 = iso.GraphMatcher(graph, honeycomb_graph5)
+    if GM.subgraph_is_isomorphic() or GM2.subgraph_is_isomorphic() or GM3.subgraph_is_isomorphic() or \
+        GM4.subgraph_is_isomorphic() or GM5.subgraph_is_isomorphic() or GM6.subgraph_is_isomorphic():
+        with open("honeycomb_structure2.txt", "a") as myfile:
             print(gold_smiles, idx)
             myfile.writelines("{},{}\n".format(gold_smiles, idx))
 
