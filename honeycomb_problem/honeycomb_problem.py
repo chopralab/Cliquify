@@ -33,7 +33,7 @@ def count_honeycomb(idx):
     GM3 = iso.GraphMatcher(graph, honeycomb_graph3)
     GM4 = iso.GraphMatcher(graph, honeycomb_graph4)
     GM5 = iso.GraphMatcher(graph, honeycomb_graph5)
-    GM6 = iso.GraphMatcher(graph, honeycomb_graph5)
+    GM6 = iso.GraphMatcher(graph, honeycomb_graph6)
     if GM.subgraph_is_isomorphic() or GM2.subgraph_is_isomorphic() or GM3.subgraph_is_isomorphic() or \
         GM4.subgraph_is_isomorphic() or GM5.subgraph_is_isomorphic() or GM6.subgraph_is_isomorphic():
         with open("honeycomb_structure2.txt", "a") as myfile:

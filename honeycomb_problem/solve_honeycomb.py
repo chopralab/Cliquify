@@ -45,27 +45,32 @@ def solve_honeycomb(idx):
     
     if gold_smiles != dec_smiles or not graph_match:
 
-        graph1 = mol_to_nx(Chem.MolFromSmiles(gold_smiles))
-        graph2 = mol_to_nx(Chem.MolFromSmiles(dec_smiles))
-        GM = iso.GraphMatcher(graph1, graph2, node_match=node_equal_iso2)
-
-
-        if GM.is_isomorphic():
-            honeycomb_solve["partial_solved"] += 1
-        else:
-            # print("unsolved", idx)
-            # print(gold_smiles)
-            # print(dec_smiles)
+        if not Chem.MolFromSmiles(dec_smiles):
             honeycomb_solve["unsolved"] += 1
+        else:
+            graph1 = mol_to_nx(Chem.MolFromSmiles(gold_smiles))
+            graph2 = mol_to_nx(Chem.MolFromSmiles(dec_smiles))
+            GM = iso.GraphMatcher(graph1, graph2, node_match=node_equal_iso2)
+
+
+            if GM.is_isomorphic():
+                honeycomb_solve["partial_solved"] += 1
+            else:
+                # print("unsolved", idx)
+                # print(gold_smiles)
+                # print(dec_smiles)
+                honeycomb_solve["unsolved"] += 1
     else:
         print("solved", idx)
         honeycomb_solve["solved"] += 1
         
+    print(honeycomb_solve)
     return
 
-# for i in range(len(smiles_list)):
-#     solve_honeycomb(i)
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    executor.map(solve_honeycomb, [i for i in range(len(smiles_list))])
+for i in range(len(smiles_list)):
+    solve_honeycomb(i)
+
+# with concurrent.futures.ThreadPoolExecutor() as executor:
+#     executor.map(solve_honeycomb, [i for i in range(len(smiles_list))])
 
 print(honeycomb_solve)

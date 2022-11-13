@@ -419,7 +419,7 @@ if __name__ == "__main__":
         
         wrong = 0
         desc_count = 0
-        for tot,s in enumerate(smiles_list[:]):
+        for tot,s in enumerate(smiles_list[:100_000]):
 
 
             tree = MolTree(s)
@@ -454,6 +454,10 @@ if __name__ == "__main__":
             # gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s))
             gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s), isomericSmiles=False)
             
+            # TEST FOR CHIRALITY DURING DECODING
+            # if s != dec_smiles:
+            #     print(tot, wrong, gold_smiles, "chirality")
+
             if gold_smiles != dec_smiles:
                 # print(gold_smiles)
                 # print(dec_smiles)
@@ -533,9 +537,10 @@ if __name__ == "__main__":
     
     # count()
     # decode_test()
+    print(timeit.Timer(decode_test).timeit(number=1))
 
-    def multi_threaded():
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(decode_test2, [i for i in range(len(smiles_list))])
+    # def multi_threaded():
+    #     with concurrent.futures.ThreadPoolExecutor() as executor:
+    #         executor.map(decode_test2, [i for i in range(len(smiles_list))])
     
-    print(timeit.Timer(multi_threaded).timeit(number=1))
+    # print(timeit.Timer(multi_threaded).timeit(number=1))

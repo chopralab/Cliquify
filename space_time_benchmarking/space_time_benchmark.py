@@ -22,6 +22,8 @@ with open("../zinc/all.txt") as f:
 
 # smiles_list = smiles_list[14755:]
 
+# filename = "fail_mol_list.txt"
+filename = "fail_mol_list_smarts.txt"
 
 def decompose_reconstruct(idx):
     chosen_smiles = smiles_list[idx]
@@ -31,10 +33,10 @@ def decompose_reconstruct(idx):
         root, cur_graph, global_amap = node_labelling(mol, cliques, molTreeEdges, triangulated_graph)
     except:
         gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
-        print(gold_smiles, "fail_deconstruct")
+        print(gold_smiles, idx, "fail_deconstruct")
         # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
         #     myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
-        with open("fail_mol_list.txt", "a") as myfile:
+        with open(filename, "a") as myfile:
             myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
         return
     
@@ -43,14 +45,20 @@ def decompose_reconstruct(idx):
     final_graph = remove_edges_reset_idx(cur_graph)
     gold_smiles, dec_smiles, graph_match  = reconstruction_evaluation(chosen_smiles, final_graph)
     
+    # if chosen_smiles != dec_smiles:
+    #     print(idx, dec_smiles, "chirality")
+
     if gold_smiles != dec_smiles or not graph_match:
-        print(gold_smiles, "fail_reconstruct")
+        print(gold_smiles, idx, "fail_reconstruct")
         # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
         #     myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
-        with open("fail_mol_list.txt", "a") as myfile:
+        with open(filename, "a") as myfile:
             myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
     
     return
 
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    executor.map(decompose_reconstruct, [i for i in range(len(smiles_list))])
+for i in range(len(smiles_list)):
+    decompose_reconstruct(i)
+
+# with concurrent.futures.ThreadPoolExecutor() as executor:
+#     executor.map(decompose_reconstruct, [i for i in range(len(smiles_list))])

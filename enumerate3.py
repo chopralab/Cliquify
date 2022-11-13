@@ -8,6 +8,7 @@ import networkx.algorithms.isomorphism as iso
 # from Cliquify.debug_script import *
 from debug_script import *
 from rdkit import RDLogger
+import numpy as np
 # from Cliquify.tree_decomposition2 import tree_decomp
 from tree_decomposition2 import tree_decomp
 lg = RDLogger.logger()
@@ -81,6 +82,14 @@ def get_fragments(mol, atoms):
     try: return Chem.MolFragmentToSmiles(mol, atoms, kekuleSmiles=True)
     except: return Chem.MolFragmentToSmiles(mol, atoms)
 
+def get_fragments2(mol, atoms):
+    try: return Chem.MolFragmentToSmiles(mol, atoms, kekuleSmiles=True, allHsExplicit=True)
+    except: 
+        return Chem.MolFragmentToSmiles(mol, atoms, allHsExplicit=True)
+
+def get_smarts_fragments(mol, atoms):
+    return Chem.MolFragmentToSmarts(mol, atoms)
+
 def get_mol2(mol, clique):
     new_mol = Chem.RWMol()
 
@@ -120,20 +129,26 @@ def get_mol2(mol, clique):
 
 class MolTreeNode(object):
 
-    def __init__(self, mol, clique=[]):
-        self.smiles = get_fragments(mol , clique)
-        # self.mol = get_mol(self.smiles)
-        # print()
-        # print(Chem.MolToSmiles(self.mol))
+    def __init__(self, mol, clique=[], smiles=None):
+        if mol and smiles: 
+            self.smiles = smiles
+            self.mol = mol
 
-        self.mol = get_mol2(mol, clique)
-        # print(Chem.MolToSmiles(self.mol))
-        # print("\n\n")
+            self.tri_mol, self.graph = get_triangulated_graph(self.mol)
+            self.clique = [x for x in clique] #copy
+            self.neighbors = []
+        else:
+            self.smiles = get_fragments(mol , clique)
+            self.smarts = get_smarts_fragments(mol , clique)
 
-        self.tri_mol, self.graph = get_triangulated_graph(self.mol)
+            self.mol = get_mol2(mol, clique) # use mol object directly
+            # self.mol = Chem.MolFromSmiles(self.smiles) # use smiles fragment string
+            # self.mol = Chem.MolFromSmarts(self.smarts) # use smarts
 
-        self.clique = [x for x in clique] #copy
-        self.neighbors = []
+            self.tri_mol, self.graph = get_triangulated_graph(self.mol)
+
+            self.clique = [x for x in clique] #copy
+            self.neighbors = []
         
     def add_neighbor(self, nei_node):
         self.neighbors.append(nei_node)
@@ -296,14 +311,28 @@ def local_attach2(ctr_graph, neighbors, prev_nodes, amap_list):
 MAX_NCAND = 6000
 
 #This version records idx mapping between ctr_mol and nei_mol
-#Keep attaching 
-def enum_attach(ctr_mol, nei_node, amap, singletons):
+#Keep attaching
+
+def enum_attach(ctr_node, nei_node, amap, singletons):
+    ctr_mol = ctr_node.tri_mol
     nei_mol,nei_idx = nei_node.tri_mol,nei_node.nid # mol -> tri_mol
 
     att_confs = []
     black_list = [atom_idx for nei_id,atom_idx,_ in amap if nei_id in singletons]
     ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list]
     ctr_bonds = [bond for bond in ctr_mol.GetBonds()]
+
+    #--------------------------------------------
+    # nei_bonds = [bond for bond in nei_mol.GetBonds()]
+    # if len(ctr_bonds) == 3 and len(nei_bonds) == 3:
+    #     count_ctr_ghost = sum([bond.GetBoolProp(KEY) for bond in ctr_bonds])
+    #     count_nei_ghost = sum([bond.GetBoolProp(KEY) for bond in nei_mol.GetBonds()])
+    #     count_neigh_of_nei = sum([1 for nei in nei_node.neighbors if nei.nid != ctr_node.nid])
+    #     print(count_ctr_ghost, count_nei_ghost, count_neigh_of_nei)
+
+    # with open("clique pair data.txt", "a") as myfile:
+    #     myfile.writelines("{} {} {}\n".format(count_ctr_ghost, count_nei_ghost, count_neigh_of_nei))
+    #--------------------------------------------
 
     if nei_mol.GetNumBonds() == 0: #neighbor singleton
         nei_atom = nei_mol.GetAtomWithIdx(0)
@@ -334,7 +363,7 @@ def enum_attach(ctr_mol, nei_node, amap, singletons):
             elif atom_equal(atom, b2):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b2.GetIdx())]
                 att_confs.append( new_amap )
-    else: 
+    else:
         #intersection is an atom
         for a1 in ctr_atoms:
             for a2 in nei_mol.GetAtoms():
@@ -404,7 +433,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
 
         nei_node = neighbors[depth]
 
-        cand_amap = enum_attach(node.tri_mol, nei_node, cur_amap, singletons) # mol -> tri_mol
+        cand_amap = enum_attach(node, nei_node, cur_amap, singletons) # mol -> tri_mol
         if print_out: print("cand_amap", cand_amap, nei_node.nid)
         true_cand_graphs = []
         candidates = []
@@ -694,7 +723,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
                 # print(i, True)
                 chosen_i  = i
 
-        # if not chosen_i: return # honeycomb not working because of this
+        if not chosen_i: return # honeycomb not working because of this
 
         total_label_amap = all_attach_confs[chosen_i]
         concat_label_amap = [label_amap for label_amap_list in total_label_amap for label_amap in label_amap_list]
@@ -729,6 +758,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
         for nei_node in children:
             if not nei_node.is_leaf:
                 dfs_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node)
+
 
 def node_labelling(mol, cliques, molTreeEdges, triangulated_graph):
 
