@@ -28,7 +28,7 @@ This work aims to improve the tree representation of the molecular graph by intr
 
 - Samples generated (Pruned)
 
-![image](https://user-images.githubusercontent.com/69520909/206062058-07dd3dcf-ac30-4a43-8815-69ad775c4cd7.png)
+![image](https://user-images.githubusercontent.com/69520909/206077036-8c31488c-b7d8-4707-8fe6-6de4e5a141e3.png)
 
 As you can from the comparison above, by using the more generalizable vocabulary from Cliquify, after random sampling, cliquify can produce molecules with diversified components.
 
@@ -47,7 +47,52 @@ Cliquify uses triangular clique decomposition, which helps in
 
 * This diagram shows the average candidate generation per tree node, from molecules which has 6 membered rings and above
 - Cliquify has low fluctuation of numbers of candidates generated as compared to JTVAE
-![image](https://user-images.githubusercontent.com/69520909/206063589-9514c14d-bbcb-463b-8c6f-b59e246ec816.png)
+![image](https://user-images.githubusercontent.com/69520909/206076233-2b2be06d-58b8-49e7-9c84-3b2112b4ea55.png)
 
+## Tree Similarity 
+* JTVAE junction tree (ring vocabulary) is not deterministic since there are potentially many molecules that correspond to the same junction tree. -
+- Using Cliquify, using the triangulation clique method
+  - increase deterministic properties of junction tree
+  - allow lesser one to many relationship between junction tree and corresponding molecule
+  ![image](https://user-images.githubusercontent.com/69520909/206075265-3c51bc64-2c0c-44a5-9c30-6984ab94a484.png)
+
++ We quantify the tree similarity between molecules using Graph Edit Distance (GED) from Networkx Library
+  - GED based on tree nodes
+  
+  ![image](https://user-images.githubusercontent.com/69520909/206075722-26481893-5a13-40c5-b2da-3cd0518f2e51.png)
+  
+  - GED based on tree nodes and edges
+  
+  ![image](https://user-images.githubusercontent.com/69520909/206075820-57194205-654b-4c06-9988-736558e6a733.png)
+  
+* Based on the two diagrams above, we can infer that cliquify produces more unique trees as compared to JTVAE, 
+making the tree structure more determistic for decoding, encourages more one to one relationship between molecules and tree structure representation.
+
+## Descendant Orientation Awareness
+- JTVAE – due to its neighborhood to neighborhood decoding process, it does not consider the orientation of the existing decoded molecule
++ Cliquify eliminate this possibility by restricting the location of possible attachment, reducing/eliminating the possibility of orientation identification error.
+  - It does that through prioritizing Non Ring Bonds attachment during graph to tree decomposition, reducing the possible triangular cliques attached to the Non Ring Bond.
+
+### Original molecule (JTVAE)
+![image](https://user-images.githubusercontent.com/69520909/206077460-2192207a-87a2-4415-91e2-6fb7816094fe.png)
+### Decoded molecule (JTVAE)
+![image](https://user-images.githubusercontent.com/69520909/206077540-e511b7b5-a427-49e2-8d88-7e70dde2ea24.png)
+
+## Honeycomb Problem
+- Honeycomb structure is prevalent in large organic molecules. JTVAE fails to capture such formation
+* Honeycomb formation requires recursive build, thus the more complicated the neighboring molecules, the larger the candidate count would be.
++ This would like result in possibility of candidate explosion.
+
+![image](https://user-images.githubusercontent.com/69520909/206078608-769f7129-c8da-47b8-a658-6a4b40ca5e55.png)
+
+### JTVAE 
+- Due to its inherent tree structure decoding, JTVAE fails to capture how multiple children of the same parent are being connected to one another.
+
+  ![image](https://user-images.githubusercontent.com/69520909/206078973-e7223a1c-25b9-46c7-bfd7-d4fc0a6030e0.png)
+
+### Cliquify
+- Cliquify is able to decompose the honeycomb structure, reducing the possibility of candidate explosion through pruning.
+
+  ![image](https://user-images.githubusercontent.com/69520909/206079002-d5fe4567-4716-4412-9fb9-6a5bf9c9c233.png)
 
 
