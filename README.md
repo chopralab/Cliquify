@@ -43,11 +43,13 @@ Cliquify uses triangular clique decomposition, which helps in
 ### JTVAE | Cliquify
 --------
 ![image](https://user-images.githubusercontent.com/69520909/206063323-e26da9d7-ffcd-44b4-ab91-5209dbe4d20a.png)
+- The diagram above shows how Cliquify reduces the possibility of candidates generation per node. 
 
-
-* This diagram shows the average candidate generation per tree node, from molecules which has 6 membered rings and above
-- Cliquify has low fluctuation of numbers of candidates generated as compared to JTVAE
 ![image](https://user-images.githubusercontent.com/69520909/206076233-2b2be06d-58b8-49e7-9c84-3b2112b4ea55.png)
+
+* The diagram above shows the average candidate generation per tree node, from molecules which has 6 membered rings and above
+- Cliquify has low fluctuation of average numbers of candidates generated as compared to JTVAE
+
 
 ## Tree Similarity 
 * JTVAE junction tree (ring vocabulary) is not deterministic since there are potentially many molecules that correspond to the same junction tree. -
