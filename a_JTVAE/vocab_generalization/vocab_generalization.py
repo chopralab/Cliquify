@@ -1,21 +1,24 @@
 import sys
 sys.path.append('../')
 from rdkit import Chem
-import networkx as nx
 import numpy as np
-import networkx.algorithms.isomorphism as iso
 
-from enumerate_random import MolTreeNode, dfs_random_assemble, remove_edges_reset_idx, set_atommap, set_atommap_graph
-from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
+from jtnn.chemutils import *
+from jtnn.mol_tree import MolTreeNode
 
-with open("vocab2.txt") as f:
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.*')
+
+
+with open("vocab.txt") as f:
     smiles_list = f.readlines()
 
-fragments = ["C.CC", "CCC"]
+fragments = ["C1CCCCC1", "C1CCCC1"]
+# fragments = ["C1CCCCC1", "CC"]
 
 np.random.seed(42)
 
-MAX_COUNT = 11
+MAX_COUNT = 3
 
 def random_sample_tree(root, depth):
     global count
@@ -25,11 +28,12 @@ def random_sample_tree(root, depth):
     if count > MAX_COUNT:
         return
         
-    # neighbors_count = np.random.randint(0, 5-depth) # max of 4 neigbors
+    # neighbors_count = np.random.randint(0,MAX_COUNT5-depth) # max of 4 neigbors
     neighbors_count = np.random.randint(1, 4) # max of 4 neigbors
 
 
     for i in range(neighbors_count):
+
         if count > MAX_COUNT: return
 
         count += i + 1
@@ -37,7 +41,7 @@ def random_sample_tree(root, depth):
 
         if topology > 0.5:
             idx = np.random.randint(0, len(fragments))
-            neigh = MolTreeNode(Chem.MolFromSmiles(fragments[idx]), smiles=fragments[idx])
+            neigh = MolTreeNode(fragments[idx])
             neigh.idx = count
 
             edges_list.append((root.idx, neigh.idx))
@@ -46,7 +50,7 @@ def random_sample_tree(root, depth):
             random_sample_tree(neigh, depth+1)
 
         else:
-            neigh = MolTreeNode(Chem.MolFromSmiles(fragments[1]), smiles=fragments[1])
+            neigh = MolTreeNode(fragments[1])
             neigh.idx = count
 
             edges_list.append((root.idx, neigh.idx))
@@ -59,7 +63,7 @@ for _ in range(1000):
 
     #--------------------------------------------------
     count = 0
-    root = MolTreeNode(Chem.MolFromSmiles(fragments[1]), smiles=fragments[1])
+    root = MolTreeNode(fragments[1])
     root.idx = 0
     nodes_dict = {root.idx: root}
     edges_list = []
@@ -70,38 +74,36 @@ for _ in range(1000):
         nodes_dict[x].add_neighbor(nodes_dict[y])
         nodes_dict[y].add_neighbor(nodes_dict[x])
 
-    # print(edges_list)    
     
     list_of_nodes = list(nodes_dict.values())
 
     for i,node in enumerate(list_of_nodes):
         node.nid = i + 1
-        if len(node.neighbors) > 1: #Leaf node mol is not marked
-            set_atommap(node.mol, node.nid)
-            set_atommap(node.tri_mol, node.nid)
-            set_atommap_graph(node.graph, node.nid)
         node.is_leaf = (len(node.neighbors) == 1)
+        if len(node.neighbors) > 1:
+            set_atommap(node.mol, node.nid)
 
     #---------------------------------------------------
 
     root_idx = 0
     root = list_of_nodes[root_idx]
-    cur_graph = root.graph.copy()
-    global_amap = [{}] + [{} for node in list_of_nodes] # nid starts with 1, thus the first dict is not used, just as offset
-    global_amap[root_idx+1] = {node:node for node in cur_graph.nodes()}
 
-    dfs_random_assemble(cur_graph, global_amap, [], root, None, print_out=False)
+    cur_mol = copy_edit_mol(root.mol)
+    global_amap = [{}] + [{} for node in list_of_nodes]
+    global_amap[root_idx + 1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()}
 
-    final_graph = remove_edges_reset_idx(cur_graph)
+    dfs_random_assemble(cur_mol, global_amap, [], root, None)
 
-    # remove unconnected nodes remnants 
-    final_graph.remove_nodes_from(list(nx.isolates(final_graph)))
 
-    cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
     dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
     dec_mol  = Chem.MolFromSmiles(dec_smiles)
 
-    if cur_mol and dec_mol:
+    cur_mol = cur_mol.GetMol()
+    cur_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cur_mol))
+
+    if cur_mol:
+        set_atommap(cur_mol)
+        dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
         print(dec_smiles)
 
         if dec_smiles not in gen_smiles_list:
@@ -110,7 +112,7 @@ for _ in range(1000):
     else:
         print(None)
 
-with open("gen_mol_count15.txt", "a") as myfile:
+with open("gen_mol_count5.txt", "a") as myfile:
     for gen_smiles in gen_smiles_list:
         myfile.writelines("{}\n".format(gen_smiles))
     # raise

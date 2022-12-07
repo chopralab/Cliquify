@@ -5,6 +5,9 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 
+import numpy as np
+np.random.seed(42)
+
 import timeit
 import concurrent.futures
 import multiprocessing
@@ -298,7 +301,6 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
     all_attach_confs = []
     singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.mol.GetNumAtoms() == 1]
 
-
     def search(cur_amap, depth):
         if len(all_attach_confs) > MAX_NCAND:
             return
@@ -313,6 +315,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
         # print('node smiles',node.smiles, 'nei_node', nei_node.smiles)
         # print("cur_amap", cur_amap) # [(nei_idx, atom.GetIdx(), b1.GetIdx())] elements of cur_amap
         cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons)
+
         # print('cand_amap', cand_amap, 'depth', depth)
         cand_smiles = set()
         candidates = []
@@ -354,6 +357,59 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[]):
 
     return candidates
 
+def enum_assemble_shrinkage(node, neighbors, prev_nodes=[], prev_amap=[]):
+    all_attach_confs = []
+    singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.mol.GetNumAtoms() == 1]
+
+    enumerate_cand_count = []
+    def search(cur_amap, depth):
+        if len(all_attach_confs) > MAX_NCAND:
+            return
+        if depth == len(neighbors):
+            all_attach_confs.append(cur_amap)
+            return
+
+        nei_node = neighbors[depth]
+
+        cand_amap = enum_attach(node.mol, nei_node, cur_amap, singletons)
+        enumerate_cand_count.append(len(cand_amap))
+
+        # print('cand_amap', cand_amap, 'depth', depth)
+        cand_smiles = set()
+        candidates = []
+        for amap in cand_amap:
+            cand_mol = local_attach(node.mol, neighbors[:depth+1], prev_nodes, amap)
+            cand_mol = sanitize(cand_mol)
+            if cand_mol is None:
+                continue
+            smiles = get_smiles(cand_mol)
+            if smiles in cand_smiles:
+                continue
+            cand_smiles.add(smiles)
+            candidates.append(amap)
+
+        if len(candidates) == 0:
+            return
+
+        for new_amap in candidates:
+            search(new_amap, depth + 1)
+
+    search(prev_amap, 0)
+
+    cand_smiles = set()
+    candidates = []
+    for amap in all_attach_confs:
+        cand_mol = local_attach(node.mol, neighbors, prev_nodes, amap)
+        cand_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cand_mol))
+        smiles = Chem.MolToSmiles(cand_mol)
+        if smiles in cand_smiles:
+            continue
+        cand_smiles.add(smiles)
+        Chem.Kekulize(cand_mol)
+        candidates.append( (smiles,cand_mol,amap) )
+
+    return candidates, enumerate_cand_count
+
 #Only used for debugging purpose
 def dfs_assemble(cur_mol, global_amap, fa_amap, cur_node, fa_node):
     fa_nid = fa_node.nid if fa_node is not None else -1
@@ -391,6 +447,86 @@ def dfs_assemble(cur_mol, global_amap, fa_amap, cur_node, fa_node):
     for nei_node in children:
         if not nei_node.is_leaf:
             dfs_assemble(cur_mol, global_amap, label_amap, nei_node, cur_node)
+
+#Only used for debugging purpose
+def dfs_random_assemble(cur_mol, global_amap, fa_amap, cur_node, fa_node):
+    fa_nid = fa_node.nid if fa_node is not None else -1
+    prev_nodes = [fa_node] if fa_node is not None else []
+
+    children = [nei for nei in cur_node.neighbors if nei.nid != fa_nid]
+    neighbors = [nei for nei in children if nei.mol.GetNumAtoms() > 1]
+    neighbors = sorted(neighbors, key=lambda x:x.mol.GetNumAtoms(), reverse=True)
+    singletons = [nei for nei in children if nei.mol.GetNumAtoms() == 1]
+    neighbors = singletons + neighbors
+
+    cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid]
+    cands = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
+
+    if not cands: return
+
+    cand_smiles, cand_mols, cand_amap = zip(*cands)
+
+    # random sample between plausible labels
+    label_idx = np.random.randint(0, len(cands))
+
+    label_amap = cand_amap[label_idx]
+
+    # print(global_amap)
+    for nei_id,ctr_atom,nei_atom in label_amap:
+        if nei_id == fa_nid:
+            continue
+        global_amap[nei_id][nei_atom] = global_amap[cur_node.nid][ctr_atom]
+    
+    # print(get_smiles(cur_mol))
+    cur_mol = attach_mols(cur_mol, children, [], global_amap) #father is already attached
+    # print(get_smiles(cur_mol))
+    # print()
+    for nei_node in children:
+        if not nei_node.is_leaf:
+            dfs_random_assemble(cur_mol, global_amap, label_amap, nei_node, cur_node)
+
+#Only used for candidate shrinkage vocab count
+def dfs_assemble_shrinkage(cur_mol, global_amap, fa_amap, cur_node, fa_node, enumerate_cand_per_node):
+    fa_nid = fa_node.nid if fa_node is not None else -1
+    prev_nodes = [fa_node] if fa_node is not None else []
+
+    children = [nei for nei in cur_node.neighbors if nei.nid != fa_nid]
+    neighbors = [nei for nei in children if nei.mol.GetNumAtoms() > 1]
+    neighbors = sorted(neighbors, key=lambda x:x.mol.GetNumAtoms(), reverse=True)
+    singletons = [nei for nei in children if nei.mol.GetNumAtoms() == 1]
+    neighbors = singletons + neighbors
+
+    cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid]
+    cands, enumerate_cand_count = enum_assemble_shrinkage(cur_node, neighbors, prev_nodes, cur_amap)
+
+    if not cands: return
+
+    avg = sum(enumerate_cand_count) / len(enumerate_cand_count)
+    # print(avg, enumerate_cand_count)
+    enumerate_cand_per_node.append(avg)
+
+    # print('num of cands:', len(cands), "cur_id", cur_node.nid, "cur_clique", cur_node.clique, "nei", [nei.clique for nei in cur_node.neighbors])
+
+    cand_smiles, cand_mols, cand_amap = zip(*cands)
+    try: cand_smiles.index(cur_node.label)
+    except: return
+    label_idx = cand_smiles.index(cur_node.label)
+    label_amap = cand_amap[label_idx]
+
+    # print(global_amap)
+    for nei_id,ctr_atom,nei_atom in label_amap:
+        if nei_id == fa_nid:
+            continue
+        global_amap[nei_id][nei_atom] = global_amap[cur_node.nid][ctr_atom]
+    
+    # print(get_smiles(cur_mol))
+    cur_mol = attach_mols(cur_mol, children, [], global_amap) #father is already attached
+    # print(get_smiles(cur_mol))
+    # print()
+    for nei_node in children:
+        if not nei_node.is_leaf:
+            dfs_assemble_shrinkage(cur_mol, global_amap, label_amap, nei_node, cur_node, enumerate_cand_per_node)
+
 
 if __name__ == "__main__":
     import sys

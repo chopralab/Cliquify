@@ -1,4 +1,5 @@
-
+import sys
+sys.path.append('../')
 from rdkit import Chem
 import itertools
 import networkx as nx
@@ -12,7 +13,6 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 import copy
 
-np.random.seed(42)
 KEY = "ghost"
 
 def copy_atom(atom):
@@ -309,23 +309,28 @@ def local_attach2(ctr_graph, neighbors, prev_nodes, amap_list):
 MAX_NCAND = 6000
 
 #This version records idx mapping between ctr_mol and nei_mol
-#Keep attaching 
+#Keep attaching
+
 def enum_attach(ctr_node, nei_node, amap, singletons):
     ctr_mol = ctr_node.tri_mol
     nei_mol,nei_idx = nei_node.tri_mol,nei_node.nid # mol -> tri_mol
-
 
     att_confs = []
     black_list = [atom_idx for nei_id,atom_idx,_ in amap if nei_id in singletons]
     ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list]
     ctr_bonds = [bond for bond in ctr_mol.GetBonds()]
 
-    #---------------------------------------------------------------
-    count_ctr_ghost = sum([bond.GetBoolProp(KEY) for bond in ctr_bonds])
-    count_nei_ghost = sum([bond.GetBoolProp(KEY) for bond in nei_mol.GetBonds()])
-    count_neigh_of_nei = sum([1 for nei in nei_node.neighbors if nei.nid != ctr_node.nid])
-    # print(count_ctr_ghost, count_nei_ghost, count_neigh_of_nei)
-    #---------------------------------------------------------------
+    #--------------------------------------------
+    # nei_bonds = [bond for bond in nei_mol.GetBonds()]
+    # if len(ctr_bonds) == 3 and len(nei_bonds) == 3:
+    #     count_ctr_ghost = sum([bond.GetBoolProp(KEY) for bond in ctr_bonds])
+    #     count_nei_ghost = sum([bond.GetBoolProp(KEY) for bond in nei_mol.GetBonds()])
+    #     count_neigh_of_nei = sum([1 for nei in nei_node.neighbors if nei.nid != ctr_node.nid])
+    #     print(count_ctr_ghost, count_nei_ghost, count_neigh_of_nei)
+
+    # with open("clique pair data.txt", "a") as myfile:
+    #     myfile.writelines("{} {} {}\n".format(count_ctr_ghost, count_nei_ghost, count_neigh_of_nei))
+    #--------------------------------------------
 
     if nei_mol.GetNumBonds() == 0: #neighbor singleton
         nei_atom = nei_mol.GetAtomWithIdx(0)
@@ -357,18 +362,15 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b2.GetIdx())]
                 att_confs.append( new_amap )
     else:
-        # if not nei_node.is_leaf and False:
-
         #intersection is an atom
-        if count_nei_ghost == 2 and count_neigh_of_nei >= 2:
-            for a1 in ctr_atoms:
-                for a2 in nei_mol.GetAtoms():
-                    if atom_equal(a1, a2):
-                        #Optimize if atom is carbon (other atoms may change valence)
-                        # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
-                        #     continue
-                        new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
-                        att_confs.append( new_amap )
+        for a1 in ctr_atoms:
+            for a2 in nei_mol.GetAtoms():
+                if atom_equal(a1, a2):
+                    #Optimize if atom is carbon (other atoms may change valence)
+                    # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
+                    #     continue
+                    new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
+                    att_confs.append( new_amap )
 
         #intersection is an bond
         if ctr_mol.GetNumBonds() > 1:
@@ -384,15 +386,45 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
 
     return att_confs
 
+import json
+class Graph:
+    def __init__(self, graph) -> None:
+        self.graph = graph
+    def __eq__(self, other):
+        if type(other) is type(self):
+            GM = iso.GraphMatcher(self.graph, other.graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
+            return GM.is_isomorphic()
+        else:
+            return False
+    def __hash__(self) -> int:
+        # return hash(nx.weisfeiler_lehman_graph_hash(self.graph,
+        #     edge_attr='color',
+        #     node_attr='map_num'))
+        # return hash(nx.weisfeiler_lehman_graph_hash(self.graph))
+
+        edges_data = []
+        for n1, n2, data in self.graph.edges.data():
+            data = json.dumps(data)
+            # edges_data.append((n1, n2, data))
+            edges_data.append((n1, n2))
+
+        nodes_data = []
+        for n, data in self.graph.nodes.data():
+            data = json.dumps(data)
+            nodes_data.append((n))
+
+        return hash((tuple(edges_data), tuple(nodes_data)))
+
+
 def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False):
     all_attach_confs = []
     singletons = [nei_node.nid for nei_node in neighbors + prev_nodes if nei_node.graph.number_of_nodes() == 1]
 
     if print_out: print(len(neighbors))
 
-    # count = 0
+    enumerate_cand_count = []
     def search(cur_amap, depth):
-        # global count
+        # globaenumerate_l count
         # count += 1
 
         if len(all_attach_confs) > MAX_NCAND:
@@ -404,16 +436,15 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
         nei_node = neighbors[depth]
 
         cand_amap = enum_attach(node, nei_node, cur_amap, singletons) # mol -> tri_mol
+        enumerate_cand_count.append(len(cand_amap))
+
         if print_out: print("cand_amap", cand_amap, nei_node.nid)
         true_cand_graphs = []
         candidates = []
         for i, amap in enumerate(cand_amap):
-            # print(amap)
 
             cand_mol = local_attach(node.tri_mol, neighbors[:depth+1], prev_nodes, amap) # mol -> tri_mol
             cand_graph = mol_to_nx(cand_mol)
-
-            # draw_mol(cand_graph, count * 1000 + i, folder="../subgraph")
 
             smiles = Chem.MolToSmiles(cand_mol)
             if print_out: print(smiles)
@@ -433,8 +464,6 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
 
     search(prev_amap, 0)
 
-    # if print_out: print("cands_id", cands_id), print(len(all_attach_confs))
-
     cand_smiles = set()
     candidates = []
     candidates_G = []
@@ -449,10 +478,124 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
         candidates.append( (smiles,cand_mol,amap) )
         candidates_G.append( (smiles,cand_G,amap) )
 
-    return candidates, candidates_G
+    return candidates, candidates_G, enumerate_cand_count
+
+def enum_assemble_singleton_tri2(cur_graph, cur_node, neighbors, prev_nodes, temp_global_amap, print_out=False): # neighbors exclude prev_nodes
+    # cur_graph and cur_node.graph is a different thing, cur_graph indicates the dfs assembled up to this point
+    nid_graph = {nei.nid: nei.graph.copy() for nei in neighbors}
+    
+    if prev_nodes: cur_nid, fa_nid = cur_node.nid, prev_nodes[0].nid
+    else: cur_nid, fa_nid = cur_node.nid, 0
+
+    cur_clique = list(temp_global_amap[cur_nid].values())
+    fa_clique = list(temp_global_amap[fa_nid].values())
+    label_starting_clique = set(cur_clique + fa_clique)
+
+    starting_graph = cur_graph.subgraph(label_starting_clique).copy()
+    possible_cands_G_set = set()
+    possible_cands_G = []
+    all_attach_confs_set = set()
+    all_attach_confs = []
+
+    def search(starting_graph, cur_amap, temp_global_amap, depth):
+
+        if depth == len(neighbors):
+            possible_cands_G.append(starting_graph)
+            all_attach_confs.append(cur_amap)
+            return
+
+        nei_node = neighbors[depth]
+        
+        cands_G, cands_G_amap = [], []
+        try: cands_G, cands_G_amap = enum_attach_double_bond2(starting_graph, nei_node, copy.deepcopy(temp_global_amap))
+        except: pass
+        try: cands2_G, cands2_G_amap = enum_attach_single_bond(starting_graph, nei_node, copy.deepcopy(temp_global_amap))
+        except: return
+        cands_G.extend(cands2_G), cands_G_amap.extend(cands2_G_amap)
+
+        candidate_graphs = [starting_graph.copy() for _ in cands_G_amap]
+        temp_global_amaps = [copy.deepcopy(temp_global_amap) for _ in cands_G_amap]
 
 
-def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=False):
+        match_new_amaps = []
+        match_new_temp_global_amaps = []
+        match_new_cand_graphs = []
+
+        mismatch_new_amaps = []
+        mismatch_new_temp_global_amaps = []
+        mismatch_new_cand_graphs = []
+        
+        possible_cands_subgraph = []
+
+        for i, label_amap in enumerate(cands_G_amap):
+            cand_graph = candidate_graphs[i]
+            temp_global_amap = temp_global_amaps[i]
+
+            # -----------------------subgraph pruning is done here-----------------------------
+            cand_G = cands_G[i]
+            node_adj = [True for node in cand_G.nodes() if len(list(cand_G.neighbors(node))) > 4]
+            if node_adj: continue
+
+            node_adj2 = [True for node in cand_G.nodes() if len(list(cand_G.neighbors(node))) == 2 and depth >= 3]
+            if len(node_adj2) > 2: continue
+
+            cand_ghost_edge = sum(nx.get_edge_attributes(cand_G, "ghost").values()) # sum of ghost edge
+            cur_ghost_edge = sum(nx.get_edge_attributes(starting_graph, "ghost").values()) # sum of ghost edge
+            nei_ghost_edge = sum(nx.get_edge_attributes(nei_node.graph, "ghost").values()) # sum of ghost edge
+            if (cand_ghost_edge < (cur_ghost_edge + nei_ghost_edge - 1)) or (cand_ghost_edge > (cur_ghost_edge + nei_ghost_edge)): continue
+
+            if Graph(cand_G) in possible_cands_G_set: continue
+            duplicate = len([1 for G in possible_cands_subgraph if nx.is_isomorphic(G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
+            if duplicate: continue
+            possible_cands_subgraph.append(cand_G)
+            # -------------------------------------------------------------------
+
+            for nei_id, ctr_atom,nei_atom, ctr_id in label_amap: # nei nid, atom idx, atom idx
+                if nei_id == fa_nid: continue
+
+                try: temp_global_amap[nei_id][nei_atom] = temp_global_amap[ctr_id][ctr_atom]
+                except:
+                    # add artificial nodes
+                    temp_global_amap[ctr_id][ctr_atom] = len(cand_graph.nodes)
+                    temp_global_amap[nei_id][nei_atom] = temp_global_amap[ctr_id][ctr_atom]
+
+                    node_attr = copy_node_attr(nid_graph[nei_id], nei_atom)
+                    cand_graph.add_node(len(cand_graph.nodes), **node_attr)
+            
+            cand_graph = attach_graphs(cand_graph, [nei_node], prev_nodes, temp_global_amap, print_out=False) #father is already attached
+            
+            new_amap = cur_amap + [tuple(label_amap)]
+            new_temp_global_amap = copy.deepcopy(temp_global_amap)
+            new_cand_graph = cand_graph.copy()
+
+            GM = iso.GraphMatcher(cur_node.label_G, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+            GM2 = iso.GraphMatcher(starting_graph, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+            GM3 = iso.GraphMatcher(cur_node.label_G, cand_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+            if GM.subgraph_is_isomorphic() and not GM2.is_isomorphic() or GM3.is_isomorphic():
+                if print_out: print((depth + 1) * 100 + i, True, label_amap)
+
+                match_new_amaps.append(new_amap)
+                match_new_temp_global_amaps.append(new_temp_global_amap)
+                match_new_cand_graphs.append(new_cand_graph)
+            else:
+                mismatch_new_amaps.append(new_amap)
+                mismatch_new_temp_global_amaps.append(new_temp_global_amap)
+                mismatch_new_cand_graphs.append(new_cand_graph)
+
+        if len(match_new_amaps) > 0:
+            for i, new_amap in enumerate(match_new_amaps):
+                search(match_new_cand_graphs[i], new_amap, match_new_temp_global_amaps[i], depth + 1)
+        else:
+            for i, new_amap in enumerate(mismatch_new_amaps):
+                search(mismatch_new_cand_graphs[i], new_amap, mismatch_new_temp_global_amaps[i], depth + 1)
+
+    search(starting_graph, [], temp_global_amap, 0)
+
+    return possible_cands_G, all_attach_confs
+
+count = 0
+#Only used for debugging purpose
+def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, enumerate_cand_per_node, print_out=False):
     global count
 
     fa_nid = fa_node.nid if fa_node is not None else -1
@@ -467,30 +610,118 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
 
     cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid] # check if there is any atommap has been occupied previously when attaching with parent
     
-    cands, cands_G = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
-    
+    tri_mol_count = [nei.tri_mol.GetNumAtoms() for nei in cur_node.neighbors]
+    # if cur_node.graph.number_of_nodes() <= 2 and len(cur_node.neighbors) >= 3 and sum(tri_mol_count) == 3 * len(tri_mol_count):
+    if cur_node.graph.number_of_nodes() <= 2 and len(cur_node.neighbors) >= 3 and sum(tri_mol_count) == 3 * len(tri_mol_count) and not min(tri_mol_count) < 3:
+        cands, cands_G, enumerate_cand_count = None, [(nx_to_mol(cur_node.label_G), cur_node.label_G, [])], [0]
+    else:
+        cands, cands_G, enumerate_cand_count = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
+
     if (not cands) and (not cands_G):
         return
-    
+
+    avg = sum(enumerate_cand_count) / len(enumerate_cand_count)
+    # print(avg, enumerate_cand_count)
+    if avg: enumerate_cand_per_node.append(avg)
+
+    label_idx = None
     cand_smiles, cand_Gs, cand_amap = zip(*cands_G)
+    for i, cand_G in enumerate(cand_Gs):
+        GM = iso.GraphMatcher(cur_node.label_G, cand_G, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)
+        if GM.is_isomorphic():
+            label_idx = i
+            break
 
-    # heuristics on cand_Gs can be done here
+    # candidate printing
+    if len(cand_Gs) > 1 and print_out: print('num of cands:', len(cand_Gs), "cur_id", cur_node.nid)
+    
+    # if not label_idx: return
+    try:
+        label_amap = cand_amap[label_idx]
+    except:
+        
+        for i, cand_G in enumerate(cand_Gs):
+            GM = iso.GraphMatcher(cur_node.label_G, cand_G, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso) # exclude hss calculation
+            if GM.is_isomorphic():
+                label_idx = i
+                break
 
-    # random sample between plausible labels
-    label_idx = np.random.randint(0, len(cands_G))
+    try:
+        label_amap = cand_amap[label_idx]
+    except:
+        gold_smiles = Chem.MolToSmiles(nx_to_mol(cur_node.label_G), isomericSmiles=False)
+        for i, smiles in enumerate(cand_smiles):
+            if smiles == gold_smiles:
+                label_idx = i
+                break    
+    
+    try:
+        label_amap = cand_amap[label_idx]
+    except:
+        for i, cand_G in enumerate(cand_Gs):
+            GM = iso.GraphMatcher(cur_node.label_G, cand_G, node_match=node_equal_iso)
+            if GM.is_isomorphic():
+                label_idx = i
+                break
+        if not label_idx: return
+        label_amap = cand_amap[label_idx]
 
-    label_amap = cand_amap[label_idx]
 
     for nei_id,ctr_atom,nei_atom in label_amap:
         if nei_id == fa_nid:
             continue
         global_amap[nei_id][nei_atom] = global_amap[cur_node.nid][ctr_atom]
 
-    cur_graph = attach_graphs(cur_graph, children, [], global_amap) #father is already attached
+    if len(label_amap) == 0:
 
-    for nei_node in children:
-        if not nei_node.is_leaf:
-            dfs_random_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node)
+        nid_graph = {child.nid: child.graph.copy() for child in children}
+        temp_global_amap = [amap for i, amap in enumerate(global_amap)] # filter all those amap which are not part of cur_node and prev_node
+        cands_G_label, all_attach_confs = enum_assemble_singleton_tri2(cur_graph, cur_node, neighbors, prev_nodes, temp_global_amap, print_out=False)
+
+        if print_out: print('num of cands:', len(all_attach_confs), "cur_id", cur_node.nid)
+        chosen_i = None
+        for i, total_label_amap in enumerate(all_attach_confs):
+            GM = iso.GraphMatcher(cur_node.label_G, cands_G_label[i], node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
+            if GM.is_isomorphic():
+                # print(i, True)
+                chosen_i  = i
+
+        if not chosen_i: return # honeycomb not working because of this
+
+        total_label_amap = all_attach_confs[chosen_i]
+        concat_label_amap = [label_amap for label_amap_list in total_label_amap for label_amap in label_amap_list]
+
+        for nei_id,ctr_atom,nei_atom, ctr_id in concat_label_amap: # nei nid, atom idx, atom idx
+            if nei_id == fa_nid: continue
+
+            try: global_amap[nei_id][nei_atom] = global_amap[ctr_id][ctr_atom]
+            except:
+                # add artificial nodes
+                global_amap[ctr_id][ctr_atom] = len(cur_graph.nodes)
+                global_amap[nei_id][nei_atom] = global_amap[ctr_id][ctr_atom]
+
+                node_attr = copy_node_attr(nid_graph[nei_id], nei_atom)
+                cur_graph.add_node(len(cur_graph.nodes), **node_attr)
+        
+        cur_graph = attach_graphs(cur_graph, children, prev_nodes, global_amap)
+
+        for i, nei_node in enumerate(children):
+            if not nei_node.is_leaf:
+                # return
+                if i == len(children) - 1:
+                    # print(total_label_amap[i])
+                    label_amap = [amap[:3] for amap in total_label_amap[i]]
+                else:
+                    label_amap = [amap[:3] for amap in total_label_amap[i] if amap[3] == cur_node.nid]
+                dfs_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node, enumerate_cand_per_node)
+
+    else:
+        cur_graph = attach_graphs(cur_graph, children, [], global_amap) #father is already attached
+
+        for nei_node in children:
+            if not nei_node.is_leaf:
+                dfs_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node, enumerate_cand_per_node)
+
 
 def node_labelling(mol, cliques, molTreeEdges, triangulated_graph):
 
@@ -534,7 +765,6 @@ def remove_edges_reset_idx(cur_graph):
     set_atommap_graph(final_graph)
 
     return final_graph
-    
 def reconstruction_evaluation(chosen_smiles, final_graph):
     cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
 
