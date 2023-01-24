@@ -18,20 +18,35 @@ def bridge_checking(cliques):
     return False
 
 count = 0
-with open("many_large_rings2.txt", "a") as myfile:
-    for smiles in smiles_list:
-        mol = Chem.MolFromSmiles(smiles)
+def many_large_rings():
+    with open("many_large_rings2.txt", "a") as myfile:
+        for smiles in smiles_list:
+            mol = Chem.MolFromSmiles(smiles)
 
-        if count == 1000: break
+            if count == 1000: break
 
-        ssr = [list(x) for x in Chem.GetSymmSSSR(mol)]
-        if bridge_checking(ssr): continue
+            ssr = [list(x) for x in Chem.GetSymmSSSR(mol)]
+            if bridge_checking(ssr): continue
 
-        large_ssr = [list(x) for x in Chem.GetSymmSSSR(mol) if len(list(x)) >= 5]
+            large_ssr = [list(x) for x in Chem.GetSymmSSSR(mol) if len(list(x)) >= 5]
 
 
-        # if len(ssr) > 5:
-        if len(large_ssr) > 5:
-            # print(smiles[:-1])
-            myfile.writelines("{}".format(smiles))
-            count += 1
+            # if len(ssr) > 5:
+            if len(large_ssr) > 5:
+                # print(smiles[:-1])
+                myfile.writelines("{}".format(smiles))
+                count += 1
+
+def bridge_rings():            
+    with open("bridge_rings.txt", "a") as myfile:
+        for smiles in smiles_list:
+            mol = Chem.MolFromSmiles(smiles)
+
+            # if count == 1000: break
+
+            ssr = [list(x) for x in Chem.GetSymmSSSR(mol)]
+            if bridge_checking(ssr):
+                myfile.writelines("{}".format(smiles))
+                count += 1
+
+    print(count)

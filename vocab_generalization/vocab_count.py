@@ -23,6 +23,11 @@ total_vocab = set()
 def vocab_count(idx):
     chosen_smiles = smiles_list[idx]
     mol = Chem.MolFromSmiles(chosen_smiles)
+
+    # remove stereochemistry
+    gold_smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
+    mol = Chem.MolFromSmiles(gold_smiles)
+
     cliques, _, _ = tree_decomp(mol)
 
     for i, clique in enumerate(cliques):

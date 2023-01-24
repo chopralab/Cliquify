@@ -51,6 +51,7 @@ def tree_decomp(mol):
             nei_list2[atom].append((cliques[i]))
 
     bridge_rings = set()
+    bridge_compounds = []
     #Merge Rings with intersection > 2 atoms
     for i in range(len(cliques)):
         if len(cliques[i]) <= 2: continue
@@ -62,13 +63,29 @@ def tree_decomp(mol):
                     bridge_rings.add(tuple(cliques[i]))
                     bridge_rings.add(tuple(cliques[j]))
 
+                    if cliques[i] in bridge_compounds: bridge_compounds.remove(cliques[i])
+
                     cliques[i].extend(cliques[j])
                     cliques[i] = list(set(cliques[i]))
+
+                    bridge_compounds.append(cliques[i])
                     # combine two rings together and get their set of atoms, this would result in the bridge compound itself
                     cliques[j] = [] # will be cleared later
-  
 
     ssr_dict = {}
+    # bridge decomposition/choose seleNode
+    for comp in bridge_compounds:
+        count = 0
+        seleList = set()
+        for idx in comp:
+            adj = set([nei for nei in graph[idx]])
+            inter = set(comp) & adj
+            if len(inter) >= 3: # count how many tripod shaped bonds in the compound
+                count += 1
+                seleList.add(idx)
+        if count == 2:
+            ssr_dict[tuple(comp)] = seleList.pop()
+
     chosen_sele = set()
     for ring1 in ssr_list:
         if tuple(ring1) in bridge_rings: continue
@@ -99,7 +116,6 @@ def tree_decomp(mol):
             else: # fused
                 ssr_dict[tuple(ring1)] = inter_atoms[0] # choose intersect atoms
         else:
-            # print(ring1, intersect_list)
 
             inter_comb = list(itertools.combinations(intersect_list, 2))
             inter_atoms = set() # intersection between ring intersection 
@@ -123,7 +139,11 @@ def tree_decomp(mol):
                         break
             else:
                 # non honeycomb
-                ssr_dict[tuple(ring1)] = union_inter.pop()
+                seleList = union_inter
+                if 1 > len(union_inter)/len(ring1) > 0.5: # if there are many intersection
+                    seleList = set(ring1) - union_inter # choose non intersecting nodes
+
+                ssr_dict[tuple(ring1)] = seleList.pop()
         
 
     original_graph = graph.copy()
@@ -205,22 +225,34 @@ def tree_decomp(mol):
                     edges[(c1,c2)] = MST_MAX_WEIGHT - 1
         else:
             # print('in here atom3', atom)
+            spiro_atoms = set()
             for i in range(len(cnei)):
                 for j in range(i + 1, len(cnei)):
                     c1,c2 = cnei[i],cnei[j]
                     inter = set(cliques[c1]) & set(cliques[c2])
+
+                    if len(inter) == 1 and len(rings) > 1: # if atom resides in more than 1 ring
+                        r1, r2 = rings
+                        ori_inter = set(original_cliques[r1]) & set(original_cliques[r2]) 
+                        if len(ori_inter) == 1: # if spiro add singleton
+                            if atom not in spiro_atoms:
+                                cliques.append([atom])
+                                spiro_atoms.add(atom)
+                            c3 = cliques.index([atom])
+                            edges[(c1,c3)] = 1
+                            edges[(c2,c3)] = 1
+                            continue
+                    
                     if edges[(c1,c2)] < len(inter):
                         edges[(c1,c2)] = len(inter) #cnei[i] < cnei[j] by construction
-    # print()
-    # # print(cliques)
+
     cliques = [tuple(cliq) for cliq in cliques]
     # for k, v in edges.items():
     #     # print(k, v)
     #     print(cliques[k[0]], cliques[k[1]], v)
+    # raise
 
-    # edges = [u + (MST_MAX_WEIGHT-v,) for u,v in edges.iteritems()]
     edges = [u + (MST_MAX_WEIGHT-v,) for u,v in edges.items()]
-    # print(edges)
     if len(edges) == 0:
         return cliques, edges
 

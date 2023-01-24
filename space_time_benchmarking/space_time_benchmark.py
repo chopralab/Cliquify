@@ -10,32 +10,32 @@ import multiprocessing
 # from Cliquify.utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
 from enumerate3 import dfs_assemble, node_labelling, remove_edges_reset_idx, reconstruction_evaluation
 from tree_decomposition2 import tree_decomp
-from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
+from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol
 
-# with open("C:\\Users\\fongm\\Downloads\\icml18-jtnn\\data\\zinc\\all.txt") as f:
-#     smiles_list = f.readlines()
-# with open("zinc\\all.txt") as f:
-#     smiles_list = f.readlines()
+
 with open("../zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 
-# smiles_list = smiles_list[14755:]
 
 # filename = "fail_mol_list.txt"
-filename = "fail_mol_list_smarts.txt"
+filename = "fail_mol_list_enum_reduced.txt"
 
 def decompose_reconstruct(idx):
     chosen_smiles = smiles_list[idx]
+
     mol = Chem.MolFromSmiles(chosen_smiles)
     cliques, molTreeEdges, triangulated_graph = tree_decomp(mol)
+
+    # for k, v in molTreeEdges:
+    #     print(cliques[k], cliques[v])
+    # raise
+
     try:
         root, cur_graph, global_amap = node_labelling(mol, cliques, molTreeEdges, triangulated_graph)
     except:
         gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
         print(gold_smiles, idx, "fail_deconstruct")
-        # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
-        #     myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
         with open(filename, "a") as myfile:
             myfile.writelines("{},{},Decompose\n".format(gold_smiles, idx))
         return
@@ -43,22 +43,29 @@ def decompose_reconstruct(idx):
     dfs_assemble(cur_graph, global_amap, [], root, None, print_out=False)
 
     final_graph = remove_edges_reset_idx(cur_graph)
+    # draw_mol(final_graph, 7778, folder="../space_time_benchmarking")
+
     gold_smiles, dec_smiles, graph_match  = reconstruction_evaluation(chosen_smiles, final_graph)
     
     # if chosen_smiles != dec_smiles:
     #     print(idx, dec_smiles, "chirality")
 
     if gold_smiles != dec_smiles or not graph_match:
-        print(gold_smiles, idx, "fail_reconstruct")
-        # with open("space_time_benchmarking\\fail_mol_list.txt", "a") as myfile:
-        #     myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
+        print(gold_smiles, dec_smiles, idx, "fail_reconstruct")
+
         with open(filename, "a") as myfile:
             myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
     
     return
 
 for i in range(len(smiles_list)):
+    # if i < 2000: continue
+    if i % 1000 == 0: print("here", i)
     decompose_reconstruct(i)
+
+    # if i == 345:
+    #     decompose_reconstruct(i)
+    #     raise
 
 # with concurrent.futures.ThreadPoolExecutor() as executor:
 #     executor.map(decompose_reconstruct, [i for i in range(len(smiles_list))])

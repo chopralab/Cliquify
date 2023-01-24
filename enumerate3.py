@@ -307,6 +307,9 @@ def local_attach2(ctr_graph, neighbors, prev_nodes, amap_list):
     inside_graph = attach_graphs(inside_graph, neighbors, prev_nodes, nei_amap)
     return inside_graph
 
+def enclosed_tri_clique(b1, b2, enclosed):
+    if enclosed: return b1.GetBoolProp(KEY) is True and b2.GetBoolProp(KEY) is True # only allow ghost bond attachment
+    else: return True # allow all attachment
 
 MAX_NCAND = 6000
 
@@ -322,6 +325,8 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
     ctr_atoms = [atom for atom in ctr_mol.GetAtoms() if atom.GetIdx() not in black_list]
     ctr_bonds = [bond for bond in ctr_mol.GetBonds()]
 
+    count_nei_ghost = sum([bond.GetBoolProp(KEY) for bond in nei_mol.GetBonds()])
+    count_ctr_ghost = sum([bond.GetBoolProp(KEY) for bond in ctr_bonds])
     #--------------------------------------------
     # nei_bonds = [bond for bond in nei_mol.GetBonds()]
     # if len(ctr_bonds) == 3 and len(nei_bonds) == 3:
@@ -354,8 +359,11 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
         b1,b2 = bond.GetBeginAtom(), bond.GetEndAtom()
 
         for atom in ctr_atoms: 
-            #Optimize if atom is carbon (other atoms may change valence)
+            ## Optimize if atom is carbon (other atoms may change valence)
             # if atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() < bond_val:
+            #     # val = [atom.GetTotalNumHs() for atom in ctr_atoms]
+            #     # print(atom.GetTotalExplicitHs(), atom.GetTotalImplicitHs())
+            #     print(count_ctr_ghost, atom.GetNumImplicitHs(), bond_val, Chem.MolToSmiles(ctr_mol), ctr_node.clique, Chem.MolToSmiles(nei_mol), nei_node.clique)
             #     continue
             if atom_equal(atom, b1):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b1.GetIdx())]
@@ -364,25 +372,33 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b2.GetIdx())]
                 att_confs.append( new_amap )
     else:
-        #intersection is an atom
-        for a1 in ctr_atoms:
-            for a2 in nei_mol.GetAtoms():
-                if atom_equal(a1, a2):
-                    #Optimize if atom is carbon (other atoms may change valence)
-                    # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
-                    #     continue
-                    new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
-                    att_confs.append( new_amap )
+        # intersection is an atom
+
+        if ctr_mol.GetNumBonds() <= 1: # only if ctr_mol is atom or bond
+            for a1 in ctr_atoms:
+                for a2 in nei_mol.GetAtoms():
+                    if atom_equal(a1, a2):
+                        #Optimize if atom is carbon (other atoms may change valence)
+                        # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
+                        #     continue
+                        new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
+                        att_confs.append( new_amap )
+
+        # print()
+        # print(Chem.MolToSmiles(ctr_mol), ctr_node.clique)
+        # print(Chem.MolToSmiles(nei_mol), nei_node.clique)
+        
+        enclosed = True if nei_node.is_leaf and count_nei_ghost == 1 else False # enclosed leaf triangular clique
 
         #intersection is an bond
         if ctr_mol.GetNumBonds() > 1:
             for b1 in ctr_bonds:
                 for b2 in nei_mol.GetBonds():
-                    if ring_bond_equal(b1, b2):
+                    if ring_bond_equal(b1, b2) and enclosed_tri_clique(b1, b2, enclosed):
                         new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetBeginAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetEndAtom().GetIdx())]
                         att_confs.append( new_amap )
 
-                    if ring_bond_equal(b1, b2, reverse=True):
+                    if ring_bond_equal(b1, b2, reverse=True) and enclosed_tri_clique(b1, b2, enclosed):
                         new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
                         att_confs.append( new_amap )
 
@@ -655,7 +671,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
     # candidate printing
     if len(cand_Gs) > 1 and print_out: print('num of cands:', len(cand_Gs), "cur_id", cur_node.nid)
     
-    # if not label_idx: return
+    # if label_idx is None: return
     try:
         label_amap = cand_amap[label_idx]
     except:
@@ -671,7 +687,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
                 label_idx = i
                 break
         # raise
-        # if not label_idx: return
+        # if label_idx is None: return
 
     try:
         label_amap = cand_amap[label_idx]
@@ -700,7 +716,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
                 # print('here2', i)
                 label_idx = i
                 break
-        if not label_idx: return
+        if label_idx is None: return
         label_amap = cand_amap[label_idx]
 
 
@@ -723,7 +739,7 @@ def dfs_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=F
                 # print(i, True)
                 chosen_i  = i
 
-        if not chosen_i: return # honeycomb not working because of this
+        if chosen_i is None: return 
 
         total_label_amap = all_attach_confs[chosen_i]
         concat_label_amap = [label_amap for label_amap_list in total_label_amap for label_amap in label_amap_list]

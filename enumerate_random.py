@@ -250,6 +250,10 @@ def ring_bond_equal(b1, b2, reverse=False):
         b2 = (b2.GetBeginAtom(), b2.GetEndAtom())
     return atom_equal(b1[0], b2[0]) and atom_equal(b1[1], b2[1]) and bond_prop
 
+def enclosed_tri_clique(b1, b2, enclosed):
+    if enclosed: return b1.GetBoolProp(KEY) is True and b2.GetBoolProp(KEY) is True # only allow ghost bond attachment
+    else: return True # allow all attachment
+
 def attach_mols(ctr_mol, neighbors, prev_nodes, nei_amap):
     prev_nids = [node.nid for node in prev_nodes]
 
@@ -357,28 +361,32 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b2.GetIdx())]
                 att_confs.append( new_amap )
     else:
+        # print("2")
         # if not nei_node.is_leaf and False:
 
-        #intersection is an atom
-        if count_nei_ghost == 2 and count_neigh_of_nei >= 2:
-            for a1 in ctr_atoms:
-                for a2 in nei_mol.GetAtoms():
-                    if atom_equal(a1, a2):
-                        #Optimize if atom is carbon (other atoms may change valence)
-                        # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
-                        #     continue
-                        new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
-                        att_confs.append( new_amap )
+        # #intersection is an atom
+        # if count_nei_ghost == 2 and count_neigh_of_nei >= 2:
+        # if ctr_mol.GetNumBonds() == 0:
+        #     for a1 in ctr_atoms:
+        #         for a2 in nei_mol.GetAtoms():
+        #             if atom_equal(a1, a2):
+        #                 #Optimize if atom is carbon (other atoms may change valence)
+        #                 # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
+        #                 #     continue
+        #                 new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
+        #                 att_confs.append( new_amap )
+        
+        enclosed = True if nei_node.is_leaf and count_nei_ghost == 1 else False # enclosed leaf triangular clique
 
         #intersection is an bond
         if ctr_mol.GetNumBonds() > 1:
             for b1 in ctr_bonds:
                 for b2 in nei_mol.GetBonds():
-                    if ring_bond_equal(b1, b2):
+                    if ring_bond_equal(b1, b2) and enclosed_tri_clique(b1, b2, enclosed):
                         new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetBeginAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetEndAtom().GetIdx())]
                         att_confs.append( new_amap )
 
-                    if ring_bond_equal(b1, b2, reverse=True):
+                    if ring_bond_equal(b1, b2, reverse=True) and enclosed_tri_clique(b1, b2, enclosed):
                         new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
                         att_confs.append( new_amap )
 
@@ -474,10 +482,20 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
     
     cand_smiles, cand_Gs, cand_amap = zip(*cands_G)
 
+    bridge_look = mol_to_nx(Chem.MolFromSmiles("C1C23CC12C3"))
+    graph_match_idx = [i for i, cand_G in enumerate(cand_Gs) if not nx.is_isomorphic(cand_G, bridge_look)]
+    
+    # for i, cand_G in enumerate(cand_Gs):
+    #     draw_mol(cand_G, i, folder="../vocab_generalization/subgraph")
+
     # heuristics on cand_Gs can be done here
 
     # random sample between plausible labels
-    label_idx = np.random.randint(0, len(cands_G))
+    if graph_match_idx: label_idx = np.random.choice(graph_match_idx)
+    else: label_idx = np.random.randint(0, len(cands_G))
+
+    # count += 1
+    # draw_mol(cand_Gs[label_idx], count, folder="../vocab_generalization/subgraph")
 
     label_amap = cand_amap[label_idx]
 
