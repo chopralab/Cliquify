@@ -14,12 +14,12 @@ RDLogger.DisableLog('rdApp.*')
 # with open("../../zinc/all.txt") as f:
 #     smiles_list = f.readlines()
 
-with open("../../candidate_shrinkage/many_large_rings2.txt") as f:
+with open("../../candidate_shrinkage/many_large_rings_increment.txt") as f:
     smiles_list = f.readlines()
 
 
 def candidate_enumeration_count(idx):
-    chosen_smiles = smiles_list[idx]
+    chosen_smiles = smiles_list[idx].split(",")[0]
     mol = Chem.MolFromSmiles(chosen_smiles)
 
 
@@ -40,7 +40,7 @@ def candidate_enumeration_count(idx):
     return enumerate_cand_per_node
 
 with open("candidate_count.txt", "a") as myfile:
-    for i in range(len(smiles_list[:1000])):
+    for i in range(len(smiles_list)):
         enumerate_cand_per_node = candidate_enumeration_count(i)
 
         avg = sum(enumerate_cand_per_node) / len(enumerate_cand_per_node)

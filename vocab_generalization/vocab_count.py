@@ -32,7 +32,7 @@ def vocab_count(idx):
 
     for i, clique in enumerate(cliques):
         if isinstance(clique, tuple):
-            if len(clique) > 4: continue
+            # if len(clique) > 4: continue
             fragment_smiles = get_fragments(mol, clique)
             # fragment_smiles = get_smarts_fragments(mol, clique)
 
@@ -50,8 +50,7 @@ for i in range(len(smiles_list)):
 total_vocab = list(total_vocab)
 print()
 print("total_vocab", len(total_vocab))
-print("unkekulizable_set", unkekulizable_set)
 
-with open("vocab_smarts.txt", "a") as myfile:
+with open("vocab_new.txt", "w") as myfile:
     for vocab in total_vocab:       
         myfile.writelines("{}\n".format(vocab))

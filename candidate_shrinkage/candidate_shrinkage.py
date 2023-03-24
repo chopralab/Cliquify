@@ -9,12 +9,12 @@ from enumerate_shrinkage import dfs_assemble, node_labelling, remove_edges_reset
 from tree_decomposition2 import tree_decomp
 from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
 
-with open("many_large_rings2.txt") as f:
+with open("many_large_rings_increment.txt") as f:
     smiles_list = f.readlines()
 
 
 def candidate_enumeration_count(idx):
-    chosen_smiles = smiles_list[idx]
+    chosen_smiles = smiles_list[idx].split(",")[0]
     mol = Chem.MolFromSmiles(chosen_smiles)
     cliques, molTreeEdges, triangulated_graph = tree_decomp(mol)
 
@@ -29,8 +29,8 @@ def candidate_enumeration_count(idx):
     # print(enumerate_cand_per_node)
     return enumerate_cand_per_node
 
-with open("candidate_count.txt", "a") as myfile:
-    for i in range(len(smiles_list[:1000])):
+with open("candidate_count.txt", "w") as myfile:
+    for i in range(len(smiles_list)):
         enumerate_cand_per_node = candidate_enumeration_count(i)
 
         avg = sum(enumerate_cand_per_node) / len(enumerate_cand_per_node)
