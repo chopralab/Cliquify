@@ -142,6 +142,8 @@ class MolTreeNode(object):
             self.smarts = get_smarts_fragments(mol , clique)
 
             self.mol = get_mol2(mol, clique) # use mol object directly
+            self.mol = data_to_mol(mol_to_data(self.mol))
+
             # self.mol = Chem.MolFromSmiles(self.smiles) # use smiles fragment string
             # self.mol = Chem.MolFromSmarts(self.smarts) # use smarts
 
@@ -216,26 +218,6 @@ def copy_edit_mol(mol):
 #---------------------------------------------------------------------------
 
 
-def remapping(mol):
-    triangulated_mol = Chem.RWMol(Chem.MolFromSmiles(''))
-    for atom in mol.GetAtoms():
-        new_atom = copy_atom(atom)
-        triangulated_mol.AddAtom(new_atom)
-
-    for bond in mol.GetBonds():
-        a1 = bond.GetBeginAtom().GetIdx()
-        a2 = bond.GetEndAtom().GetIdx()
-
-        try:
-            if not bond.GetBoolProp(KEY):
-                triangulated_mol.AddBond(a1, a2, order=bond.GetBondType())
-            else:
-                triangulated_mol.AddBond(a1, a2, order=Chem.BondType.DOUBLE)
-        except:
-            triangulated_mol.AddBond(a1, a2, order=bond.GetBondType())
-
-    return triangulated_mol.GetMol()
-
 def atom_equal(a1, a2):
     return a1.GetSymbol() == a2.GetSymbol() and a1.GetFormalCharge() == a2.GetFormalCharge()
 
@@ -295,17 +277,6 @@ def local_attach(ctr_mol, neighbors, prev_nodes, amap_list):
 
     ctr_mol = attach_mols(ctr_mol, neighbors, prev_nodes, nei_amap)
     return ctr_mol.GetMol()
-
-
-def local_attach2(ctr_graph, neighbors, prev_nodes, amap_list):
-    inside_graph = ctr_graph.copy()
-    nei_amap = {nei.nid:{} for nei in prev_nodes + neighbors}
-
-    for nei_id,ctr_atom,nei_atom in amap_list:
-        nei_amap[nei_id][nei_atom] = ctr_atom
-
-    inside_graph = attach_graphs(inside_graph, neighbors, prev_nodes, nei_amap)
-    return inside_graph
 
 def enclosed_tri_clique(b1, b2, enclosed):
     if enclosed: return b1.GetBoolProp(KEY) is True and b2.GetBoolProp(KEY) is True # only allow ghost bond attachment
@@ -383,10 +354,6 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
                         #     continue
                         new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
                         att_confs.append( new_amap )
-
-        # print()
-        # print(Chem.MolToSmiles(ctr_mol), ctr_node.clique)
-        # print(Chem.MolToSmiles(nei_mol), nei_node.clique)
         
         enclosed = True if nei_node.is_leaf and count_nei_ghost == 1 else False # enclosed leaf triangular clique
 
@@ -460,10 +427,14 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
             if print_out: print(smiles)
 
             # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph)]) # less candidate due to less specific
-            duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
+            # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
+            # if duplicate: continue
+            for G in true_cand_graphs:
+                if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso):
+                    duplicate = True; break
             if duplicate: continue
-            true_cand_graphs.append(cand_graph)
-            
+
+            true_cand_graphs.append(cand_graph)        
             candidates.append(amap)
 
         if len(candidates) == 0:

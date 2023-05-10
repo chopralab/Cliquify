@@ -159,10 +159,8 @@ class MolTreeNode(object):
             for cidx in self.clique:
                 original_graph.nodes[cidx]["map_num"] = self.nid
         
-        # all_edges = list(self.graph.edges())
         for nei_node in self.neighbors:
             clique.append(nei_node.clique)
-            # all_edges.extend(list(self.graph.edges()))
             if nei_node.is_leaf: #Leaf node, no need to mark 
                 continue
             for cidx in nei_node.clique:
@@ -185,9 +183,6 @@ class MolTreeNode(object):
         for edge in list(temp_graph.edges()):
             if set(edge) not in valid_bonds:
                 self.label_G.remove_edge(*edge)
-
-        # if self.nid == 1:
-        #     draw_mol(self.label_G, self.nid + 10_000, ['map_num', 'bond_type', 'color'])
         
         return self.label_G
             
@@ -299,17 +294,6 @@ def local_attach(ctr_mol, neighbors, prev_nodes, amap_list):
     return ctr_mol.GetMol()
 
 
-def local_attach2(ctr_graph, neighbors, prev_nodes, amap_list):
-    inside_graph = ctr_graph.copy()
-    nei_amap = {nei.nid:{} for nei in prev_nodes + neighbors}
-
-    for nei_id,ctr_atom,nei_atom in amap_list:
-        nei_amap[nei_id][nei_atom] = ctr_atom
-
-    inside_graph = attach_graphs(inside_graph, neighbors, prev_nodes, nei_amap)
-    return inside_graph
-
-
 MAX_NCAND = 6000
 
 #This version records idx mapping between ctr_mol and nei_mol
@@ -361,21 +345,6 @@ def enum_attach(ctr_node, nei_node, amap, singletons):
                 new_amap = amap + [(nei_idx, atom.GetIdx(), b2.GetIdx())]
                 att_confs.append( new_amap )
     else:
-        # print("2")
-        # if not nei_node.is_leaf and False:
-
-        # #intersection is an atom
-        # if count_nei_ghost == 2 and count_neigh_of_nei >= 2:
-        # if ctr_mol.GetNumBonds() == 0:
-        #     for a1 in ctr_atoms:
-        #         for a2 in nei_mol.GetAtoms():
-        #             if atom_equal(a1, a2):
-        #                 #Optimize if atom is carbon (other atoms may change valence)
-        #                 # if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
-        #                 #     continue
-        #                 new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
-        #                 att_confs.append( new_amap )
-        
         enclosed = True if nei_node.is_leaf and count_nei_ghost == 1 else False # enclosed leaf triangular clique
 
         #intersection is an bond
@@ -413,8 +382,6 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
         true_cand_graphs = []
         candidates = []
         for i, amap in enumerate(cand_amap):
-            # print(amap)
-
             cand_mol = local_attach(node.tri_mol, neighbors[:depth+1], prev_nodes, amap) # mol -> tri_mol
             cand_graph = mol_to_nx(cand_mol)
 
@@ -437,8 +404,6 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
 
     search(prev_amap, 0)
 
-    # if print_out: print("cands_id", cands_id), print(len(all_attach_confs))
-
     cand_smiles = set()
     candidates = []
     candidates_G = []
@@ -456,7 +421,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
     return candidates, candidates_G
 
 
-def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=False):
+def dfs_all_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, possible_attachment):
 
     fa_nid = fa_node.nid if fa_node is not None else -1
     prev_nodes = [fa_node] if fa_node is not None else []
@@ -472,27 +437,19 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
     
     cands, cands_G = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
     
+    # add all possible attachments
+    possible_attachment[cur_node.nid] = len(cands)
+    
     if (not cands) and (not cands_G):
         return
     
     cand_smiles, cand_Gs, cand_amap = zip(*cands_G)
-
-    bridge_look = mol_to_nx(Chem.MolFromSmiles("C1C23CC12C3"))
-    graph_match_idx = [i for i, cand_G in enumerate(cand_Gs) if not nx.is_isomorphic(cand_G, bridge_look)]
-    
-    # for i, cand_G in enumerate(cand_Gs):
-    #     draw_mol(cand_G, i, folder="../vocab_generalization/subgraph")
-
-    # heuristics on cand_Gs can be done here
-
-    # random sample between plausible labels
-    if graph_match_idx: label_idx = np.random.choice(graph_match_idx)
-    else: label_idx = np.random.randint(0, len(cands_G))
-
-    # count += 1
-    # draw_mol(cand_Gs[label_idx], count, folder="../vocab_generalization/subgraph")
-
-    label_amap = cand_amap[label_idx]
+        
+    if not cur_node.cand_idx:
+        label_idx = np.random.randint(0, len(cands_G))
+        label_amap = cand_amap[label_idx]
+    else:
+        label_amap = cand_amap[cur_node.cand_idx]
 
     for nei_id,ctr_atom,nei_atom in label_amap:
         if nei_id == fa_nid:
@@ -503,7 +460,7 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
 
     for nei_node in children:
         if not nei_node.is_leaf:
-            dfs_random_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node)
+            dfs_all_assemble(cur_graph, global_amap, label_amap, nei_node, cur_node, possible_attachment)
 
 def node_labelling(mol, cliques, molTreeEdges, triangulated_graph):
 
@@ -526,7 +483,6 @@ def node_labelling(mol, cliques, molTreeEdges, triangulated_graph):
             set_atommap_graph(node.graph, node.nid)
         node.is_leaf = (len(node.neighbors) == 1)
 
-
     for node in list_of_nodes:
         node.recover_G(triangulated_graph.copy())
 
@@ -547,26 +503,3 @@ def remove_edges_reset_idx(cur_graph):
     set_atommap_graph(final_graph)
 
     return final_graph
-    
-def reconstruction_evaluation(chosen_smiles, final_graph):
-    cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
-
-    chosen_graph = mol_to_nx(Chem.MolFromSmiles(chosen_smiles))
-    graph_match = nx.is_isomorphic(final_graph, chosen_graph, node_match=node_equal_iso2, edge_match=ring_edge_equal_iso)
-
-
-    gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
-    dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
-
-    return gold_smiles, dec_smiles, graph_match
-    
-def add_ghost_edges(G, ghost_edges):
-
-    for edge in ghost_edges:
-        G.add_edge(edge[0],
-                edge[1],
-                bond_type=Chem.BondType.SINGLE,
-                ghost=True,
-                color='r',
-                )
-    return G

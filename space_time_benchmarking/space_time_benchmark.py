@@ -19,7 +19,7 @@ with open("../zinc/all.txt") as f:
 
 
 # filename = "fail_mol_list.txt"
-filename = "fail_mol_list_enum_reduced.txt"
+filename = "fail_mol_list_enum_reduced(multithreaded).txt"
 
 def decompose_reconstruct(idx):
     chosen_smiles = smiles_list[idx]
@@ -31,8 +31,9 @@ def decompose_reconstruct(idx):
     #     print(cliques[k], cliques[v])
     # raise
 
+    root, cur_graph, global_amap = node_labelling(mol, cliques, molTreeEdges, triangulated_graph)
     try:
-        root, cur_graph, global_amap = node_labelling(mol, cliques, molTreeEdges, triangulated_graph)
+        pass
     except:
         gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(chosen_smiles), isomericSmiles=False)
         print(gold_smiles, idx, "fail_deconstruct")
@@ -53,19 +54,25 @@ def decompose_reconstruct(idx):
     if gold_smiles != dec_smiles or not graph_match:
         print(gold_smiles, dec_smiles, idx, "fail_reconstruct")
 
-        with open(filename, "a") as myfile:
-            myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
+        # with open(filename, "a") as myfile:
+        #     myfile.writelines("{},{},Reconstruct\n".format(gold_smiles, idx))
     
     return
 
 for i in range(len(smiles_list)):
     # if i < 2000: continue
-    if i % 1000 == 0: print("here", i)
+    # if i % 1000 == 0: print("here", i)
     decompose_reconstruct(i)
-
     # if i == 345:
     #     decompose_reconstruct(i)
     #     raise
 
-# with concurrent.futures.ThreadPoolExecutor() as executor:
+# import time
+# t0 = time.time()
+
+# with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
 #     executor.map(decompose_reconstruct, [i for i in range(len(smiles_list))])
+
+# t1 = time.time()
+# total = t1-t0
+# print(total, "seconds")

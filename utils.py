@@ -90,6 +90,18 @@ def nx_to_mol(G):
     except: pass
     return mol
 
+import pickle
+
+def mol_to_data(mol, filename="vocab.txt"):
+    G = mol_to_nx(mol)
+    pickle.dump(G, open(filename, "wb"))
+    return filename
+
+def data_to_mol(filename):
+    G = pickle.load(open(filename, "rb"))
+    mol = nx_to_mol(G)
+    return mol
+
 # ON NETWORKX GRAPH
 
 def node_equal_iso(node1, node2):
