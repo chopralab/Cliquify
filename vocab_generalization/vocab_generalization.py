@@ -6,7 +6,7 @@ import numpy as np
 import networkx.algorithms.isomorphism as iso
 
 from enumerate_random import MolTreeNode, dfs_random_assemble, remove_edges_reset_idx, set_atommap, set_atommap_graph
-from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso
+from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol
 
 with open("vocab2.txt") as f:
     smiles_list = f.readlines()
@@ -26,7 +26,7 @@ def random_sample_tree(root, depth):
         return
         
     # neighbors_count = np.random.randint(0, 5-depth) # max of 4 neigbors
-    neighbors_count = np.random.randint(1, 4) # max of 4 neigbors
+    neighbors_count = np.random.randint(1,3) # max of 4 neigbors
 
 
     for i in range(neighbors_count):
@@ -56,6 +56,9 @@ def random_sample_tree(root, depth):
 
 gen_smiles_list = []
 for _ in range(1000):
+
+    # if _ != 1:
+    #     continue
 
     #--------------------------------------------------
     count = 0
@@ -92,7 +95,9 @@ for _ in range(1000):
 
     dfs_random_assemble(cur_graph, global_amap, [], root, None, print_out=False)
 
+    # draw_mol(cur_graph, 9999, folder="../vocab_generalization/subgraph")
     final_graph = remove_edges_reset_idx(cur_graph)
+    # draw_mol(final_graph, 10_000, folder="../vocab_generalization/subgraph")
 
     # remove unconnected nodes remnants 
     final_graph.remove_nodes_from(list(nx.isolates(final_graph)))
@@ -104,13 +109,20 @@ for _ in range(1000):
     if cur_mol and dec_mol:
         print(dec_smiles)
 
+        # # if dec_smiles == "CCCC1CCCC2CCC2C1":
+        # if dec_smiles == "C1CC2(C1)CCC2":
+        #     draw_mol(cur_graph, 7778, folder="../vocab_generalization/subgraph")
+        #     print(_)
+        #     raise
+
         if dec_smiles not in gen_smiles_list:
             gen_smiles_list.append(dec_smiles)
 
     else:
         print(None)
 
-with open("gen_mol_count15.txt", "a") as myfile:
+
+with open("gen_mol_count_test_nei_enclosed(no_bridge).txt", "a") as myfile:
     for gen_smiles in gen_smiles_list:
         myfile.writelines("{}\n".format(gen_smiles))
     # raise
