@@ -429,6 +429,7 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
             # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph)]) # less candidate due to less specific
             # duplicate = len([1 for G in true_cand_graphs if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso)]) # more candidate due to more specific
             # if duplicate: continue
+            duplicate = False
             for G in true_cand_graphs:
                 if nx.is_isomorphic(G, cand_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso):
                     duplicate = True; break

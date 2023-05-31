@@ -128,66 +128,12 @@ def get_mol2(mol, clique):
 class MolTreeNode(object):
 
     def __init__(self, mol, clique=[], smiles=None):
-        if mol and smiles: 
-            self.smiles = smiles
-            self.mol = mol
-
-            self.tri_mol, self.graph = get_triangulated_graph(self.mol)
-            self.clique = [x for x in clique] #copy
-            self.neighbors = []
-        else:
-            self.smiles = get_fragments(mol , clique)
-            self.smarts = get_smarts_fragments(mol , clique)
-
-            self.mol = get_mol2(mol, clique) # use mol object directly
-            # self.mol = Chem.MolFromSmiles(self.smiles) # use smiles fragment string
-            # self.mol = Chem.MolFromSmarts(self.smarts) # use smarts
-
-            self.tri_mol, self.graph = get_triangulated_graph(self.mol)
-
-            self.clique = [x for x in clique] #copy
-            self.neighbors = []
-        
+        self.mol, self.tri_mol = mol, mol
+        self.graph = mol_to_nx(mol)
+        self.neighbors = []
+               
     def add_neighbor(self, nei_node):
         self.neighbors.append(nei_node)
-
-    def recover_G(self, original_graph):
-        clique = []
-        clique.append(self.clique)
-
-        if not self.is_leaf:
-            for cidx in self.clique:
-                original_graph.nodes[cidx]["map_num"] = self.nid
-        
-        for nei_node in self.neighbors:
-            clique.append(nei_node.clique)
-            if nei_node.is_leaf: #Leaf node, no need to mark 
-                continue
-            for cidx in nei_node.clique:
-                #allow singleton node override the atom mapping
-                if cidx not in self.clique or len(nei_node.clique) == 1: # neighboring node atom will only override non ctr clique atom
-                    node = original_graph.nodes[cidx]
-                    node["map_num"] = nei_node.nid
-                    # print(cidx, nei_node.nid, 'current', self.nid)
-        
-        valid_bonds = []
-        for cliq in clique:
-            subset_possible_bonds = list(itertools.combinations(cliq, 2))
-            for bond in subset_possible_bonds:
-                if original_graph.has_edge(*bond): valid_bonds.append(set(bond))
-
-        clique = list(set([node for cliq in clique for node in cliq]))
-        temp_graph = original_graph.subgraph(clique).copy()
-        self.label_G = original_graph.subgraph(clique).copy()
-
-        for edge in list(temp_graph.edges()):
-            if set(edge) not in valid_bonds:
-                self.label_G.remove_edge(*edge)
-        
-        return self.label_G
-            
-def get_smiles(mol):
-    return Chem.MolToSmiles(mol, kekuleSmiles=True)
 
 def copy_edit_mol(mol):
     new_mol = Chem.RWMol(Chem.MolFromSmiles(''))
@@ -207,27 +153,6 @@ def copy_edit_mol(mol):
     return new_mol
 
 #---------------------------------------------------------------------------
-
-
-def remapping(mol):
-    triangulated_mol = Chem.RWMol(Chem.MolFromSmiles(''))
-    for atom in mol.GetAtoms():
-        new_atom = copy_atom(atom)
-        triangulated_mol.AddAtom(new_atom)
-
-    for bond in mol.GetBonds():
-        a1 = bond.GetBeginAtom().GetIdx()
-        a2 = bond.GetEndAtom().GetIdx()
-
-        try:
-            if not bond.GetBoolProp(KEY):
-                triangulated_mol.AddBond(a1, a2, order=bond.GetBondType())
-            else:
-                triangulated_mol.AddBond(a1, a2, order=Chem.BondType.DOUBLE)
-        except:
-            triangulated_mol.AddBond(a1, a2, order=bond.GetBondType())
-
-    return triangulated_mol.GetMol()
 
 def atom_equal(a1, a2):
     return a1.GetSymbol() == a2.GetSymbol() and a1.GetFormalCharge() == a2.GetFormalCharge()

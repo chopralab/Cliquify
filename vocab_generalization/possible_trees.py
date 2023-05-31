@@ -5,6 +5,7 @@ import networkx as nx
 import numpy as np
 import networkx.algorithms.isomorphism as iso
 import itertools
+import random
 import os
 
 from enumerate_all import MolTreeNode, dfs_all_assemble, remove_edges_reset_idx, set_atommap, set_atommap_graph
@@ -16,6 +17,7 @@ def get_trees(nodes):
     # generate all pairwise combinations of nodes
     edges =  [a for a in itertools.product(range(nodes), range(nodes))]
 
+    # print(edges)
     # use sets to lose..
     # ..symmetric edges: (0,1), (1,0) => keep only (0,1) 
     edges = list(set([tuple(set(e)) for e in edges]))
@@ -32,12 +34,14 @@ def get_trees(nodes):
             G = nx.Graph()
             G.add_edges_from(o)
             
-            nei_larger_2 = [1 if len(nei) > 3 else 0 for node, nei in G.adjacency()] 
+            nei_larger_2 = [1 if len(nei) > 2 else 0 for node, nei in G.adjacency()] 
             if sum(nei_larger_2): continue
                 
             # make sure all nodes are connected
             if len(list(nx.connected_components(G)))==1:
+                # print('flt', flattened)
                 trees.append(G)
+                return trees
 
     return trees
 
@@ -46,8 +50,8 @@ def get_combinations_vocab(nums, r):
     return combos
 
 def get_combinations_attachment(nums):
-    combos = list(itertools.product(*(range(num) for num in nums)))
-    return combos
+    combos_ = list(itertools.product(*(range(num+1) for num in nums)))
+    return combos_
 
 def prepare_mol_tree(tree, vocab_list, attachment_idxs=None):
     nodes_dict = {}
@@ -63,14 +67,15 @@ def prepare_mol_tree(tree, vocab_list, attachment_idxs=None):
     
     list_of_nodes = list(nodes_dict.values())
 
+
     for i, node in enumerate(list_of_nodes):
         node.nid = i + 1
         if len(node.neighbors) > 1: #Leaf node mol is not marked
             set_atommap(node.mol, node.nid)
             set_atommap(node.tri_mol, node.nid)
             set_atommap_graph(node.graph, node.nid)
-        if attachment_idxs:
-            node.cand_idx = attachment_idxs[i]
+
+        node.cand_idx = attachment_idxs[i] if attachment_idxs else None
         node.is_leaf = (len(node.neighbors) == 1)
 
     #-----------------------------------------------
@@ -84,15 +89,17 @@ def prepare_mol_tree(tree, vocab_list, attachment_idxs=None):
 
 def main():
 
-    n = 5
+    n = 15
     trees = get_trees(n)
 
     VOCAB_SIZE = len(os.listdir("../vocab_generalization/graph_vocab"))
+    VOCAB_SIZE = VOCAB_SIZE // 10
+    # VOCAB_SIZE = 10
 
-    vocab_combination = get_combinations_vocab(range(VOCAB_SIZE), n)
-
+    # vocab_combination = get_combinations_vocab(range(VOCAB_SIZE), n)
+    vocab_combination = [random.choices([8, 7, 0, 3, 1, 9, 2, 17, 16, 20, 4, 25, 39, 19, 67, 21, 32, 26, 5], k=n)] # random sampling
+    print(vocab_combination)
     input = itertools.product(trees, vocab_combination)
-
 
     for tree, vocab_list in input:
         
@@ -100,30 +107,44 @@ def main():
 
         # -----------------------FIND ALL POSSIBLE ATTACHMENT-------------------------#
 
-        possible_attachment = {}
-        dfs_all_assemble(cur_graph, global_amap, [], root, None, possible_attachment)
+        psb_attch = {}
+        dfs_all_assemble(cur_graph, global_amap, [], root, None, psb_attch)
+        # print(psb_attch)
 
-        print(possible_attachment)
-
-        attachment = [possible_attachment[i+1] for i in range(len(possible_attachment))]
+        attachment = [psb_attch[i+1] if psb_attch.get(i+1) else 0 for i in tree.nodes]
+        print(attachment)
         attachment_idxs = get_combinations_attachment(attachment)        
 
 
         #------------------ENUMERATE ALL POSSIBLE ATTACHMENTS-------------------------#
 
         for attachment_idx in attachment_idxs:
-            prepare_mol_tree(tree, vocab_list, attachment_idx)
 
-        final_graph = remove_edges_reset_idx(cur_graph)
+            # attachment_idx = attachment_idxs[random.randrange(len(attachment_idxs))] # random sampling
 
-        # if it forms valid graph
-        if len(list(nx.connected_components(final_graph))) == 1:
-            cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
-            dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
-            dec_mol  = Chem.MolFromSmiles(dec_smiles)
+            cur_graph, global_amap, root = prepare_mol_tree(tree, vocab_list, attachment_idx)
+            psb_attch = {}
+            dfs_all_assemble(cur_graph, global_amap, [], root, None, psb_attch)
 
-            if cur_mol and dec_mol:
-                return dec_smiles
+            final_graph = remove_edges_reset_idx(cur_graph)
+            draw_mol(final_graph, 7778, folder="../vocab_generalization/subgraph")
+            from rdkit.Chem import Draw
+            mol = nx_to_mol(final_graph)
+            # mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+            fig = Draw.MolToMPL(mol)
+            fig.savefig('../vocab_generalization/subgraph/mol.jpeg', bbox_inches='tight')
+
+
+
+            raise
+            # if it forms valid graph
+            if len(list(nx.connected_components(final_graph))) == 1:
+                cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
+                dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
+                dec_mol  = Chem.MolFromSmiles(dec_smiles)
+
+                if cur_mol and dec_mol:
+                    return dec_smiles
 
     
     nums = [5, 2, 4, 2]

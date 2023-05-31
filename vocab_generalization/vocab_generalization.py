@@ -32,7 +32,7 @@ def random_sample_tree(root, depth):
     for i in range(neighbors_count):
         if count > MAX_COUNT: return
 
-        count += i + 1
+        count += 1
         topology = np.random.rand()
 
         if topology > 0.5:
@@ -56,9 +56,6 @@ def random_sample_tree(root, depth):
 
 gen_smiles_list = []
 for _ in range(1000):
-
-    # if _ != 1:
-    #     continue
 
     #--------------------------------------------------
     count = 0
@@ -118,8 +115,8 @@ for _ in range(1000):
         if dec_smiles not in gen_smiles_list:
             gen_smiles_list.append(dec_smiles)
 
-    else:
-        print(None)
+    # else:
+    #     print(None)
 
 
 with open("gen_mol_count_test_nei_enclosed(no_bridge).txt", "a") as myfile:

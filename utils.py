@@ -27,8 +27,8 @@ def mol_to_nx(mol, skip_unattached=False):
         G.add_node(atom.GetIdx(),
                    symbol=atom.GetSymbol(),
                    formal_charge=atom.GetFormalCharge(),
-                   chiral_tag=atom.GetChiralTag(),
-                   hybridization=atom.GetHybridization(),
+                #    chiral_tag=atom.GetChiralTag(),
+                #    hybridization=atom.GetHybridization(),
                    num_explicit_hs=atom.GetNumExplicitHs(),
                    is_aromatic=atom.GetIsAromatic(),
                    map_num=atom.GetAtomMapNum())
@@ -46,20 +46,20 @@ def nx_to_mol(G):
     mol = Chem.RWMol()
     # Chem.rdDepictor.Compute2DCoords(mol)
     atomic_nums = nx.get_node_attributes(G, 'symbol')
-    chiral_tags = nx.get_node_attributes(G, 'chiral_tag')
+    # chiral_tags = nx.get_node_attributes(G, 'chiral_tag')
     formal_charges = nx.get_node_attributes(G, 'formal_charge')
     node_is_aromatics = nx.get_node_attributes(G, 'is_aromatic')
-    node_hybridizations = nx.get_node_attributes(G, 'hybridization')
+    # node_hybridizations = nx.get_node_attributes(G, 'hybridization')
     num_explicit_hss = nx.get_node_attributes(G, 'num_explicit_hs')
     map_nums = nx.get_node_attributes(G, 'map_num')
     node_to_idx = {}
     for node in G.nodes():
         # print(node, atomic_nums[node], num_explicit_hss[node], node_is_aromatics[node])
         a=Chem.Atom(atomic_nums[node])
-        a.SetChiralTag(chiral_tags[node])
+        # a.SetChiralTag(chiral_tags[node])
         a.SetFormalCharge(formal_charges[node])
         a.SetIsAromatic(node_is_aromatics[node])
-        a.SetHybridization(node_hybridizations[node])
+        # a.SetHybridization(node_hybridizations[node])
         a.SetNumExplicitHs(num_explicit_hss[node])
         a.SetAtomMapNum(map_nums[node])
         idx = mol.AddAtom(a)
@@ -127,10 +127,10 @@ def ring_edge_equal_iso2(edge1, edge2):
 def copy_node_attr(G, idx):
     val = {
         "symbol": G.nodes[idx]["symbol"],
-        "chiral_tag": G.nodes[idx]["chiral_tag"],
+        # "chiral_tag": G.nodes[idx]["chiral_tag"],
         "formal_charge": G.nodes[idx]["formal_charge"],
         "is_aromatic": G.nodes[idx]["is_aromatic"],
-        "hybridization": G.nodes[idx]["hybridization"],
+        # "hybridization": G.nodes[idx]["hybridization"],
         "num_explicit_hs": G.nodes[idx]["num_explicit_hs"],
         "map_num": G.nodes[idx]["map_num"],
     }
