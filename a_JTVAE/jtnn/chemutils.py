@@ -538,7 +538,7 @@ if __name__ == "__main__":
     mol_tree = MolTree("C")
     assert len(mol_tree.nodes) > 0
 
-    with open("../../zinc/all.txt") as f:
+    with open("../../zdata/zinc/all.txt") as f:
         smiles_list = f.readlines()
 
     

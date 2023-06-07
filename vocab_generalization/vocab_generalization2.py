@@ -6,11 +6,26 @@ import numpy as np
 import networkx.algorithms.isomorphism as iso
 import random
 import pickle
+import json
 
 from enumerate_random import MolTreeNode, dfs_random_assemble, remove_edges_reset_idx, set_atommap, set_atommap_graph
 from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol, data_to_mol
-from search_tree_vocab import get_common_vocabs, tree_vocab_byAtom, tree_vocab_byBond, vocab_usage
+from search_tree_vocab import get_common_vocabs, tree_vocab_byAtom, tree_vocab_byBond, tree_vocab_byBondType, vocab_usage
 
+def load_cond_proba():
+    global cond_probability_one
+    global cond_probability_two
+    global total_one
+    global total_two
+    
+    with open('../vocab_generalization/cond_proba/cond_probability_one.json', 'r') as json_file:
+        cond_probability_one = json.load(json_file) 
+    with open('../vocab_generalization/cond_proba/cond_probability_two.json', 'r') as json_file:
+        cond_probability_two = json.load(json_file) 
+    with open('../vocab_generalization/cond_proba/total_one.json', 'r') as json_file:
+        total_one = json.load(json_file) 
+    with open('../vocab_generalization/cond_proba/total_two.json', 'r') as json_file:
+        total_two = json.load(json_file)
 
 def vocab(idx):
     return data_to_mol("../vocab_generalization/graph_vocab2/{}".format(idx))
@@ -32,7 +47,7 @@ def get_vocab_via_conn(prev, current, suitable_vocabs):
         num_prev = prev.graph.number_of_nodes()
 
         if num_prev == 3 and num_current == 0: # complete spiro
-            return list(tree_vocab_byBond[3]["2F"] & suitable_vocabs)
+            return list((tree_vocab_byBond[3]["2F"] | tree_vocab_byBond[3]["2T"]) & suitable_vocabs)
         elif num_prev == 1 and num_current == 0: # complete single bonds -|-
             return list(tree_vocab_byBond[1] & suitable_vocabs)
     
@@ -48,36 +63,73 @@ def get_vocab_via_conn(prev, current, suitable_vocabs):
         else: filter_vocab = tree_vocab_byBond[clq_size]
         
         if filter_vocab & suitable_vocabs:
+            # print(len(filter_vocab & suitable_vocabs), len(suitable_vocabs), len(filter_vocab & suitable_vocabs))
             return list(filter_vocab & suitable_vocabs)
         
     return list(suitable_vocabs)
 
 
-def get_suitable_vocab(prev, root, is_leaf=False):
+def get_suitable_vocab(prev, root, is_leaf=False, filter_edge=True):
     suitable_vocabs = set()
     if not is_leaf:
         for idx, data in root.graph.nodes.data():
             sym, chrg, hs, arom, _ = data.values()
             suitable_vocabs |= tree_vocab_byAtom[sym][chrg][hs][arom]
+
+        if filter_edge:
+            vocab_filter = set()
+            for atom in root.tri_mol.GetAtoms():
+                num_electrons = atom.GetAtomicNum() % 8 - 2 # valence electrons
+                # print(num_electrons, atom.GetSymbol(), atom.GetTotalNumHs())
+                for bond in atom.GetBonds(): 
+                    num_electrons -= bond.GetBondTypeAsDouble()
+
+                if num_electrons % 2 == 0: # even
+                    vocab_filter |= tree_vocab_byBondType[2.0]
+                    vocab_filter |= tree_vocab_byBondType[1.0]
+                elif num_electrons % 2 == 1: # odd
+                    if num_electrons >= 3: vocab_filter |= tree_vocab_byBondType[3.0]
+                    vocab_filter |= tree_vocab_byBondType[1.0]
+                elif num_electrons % 2 == 0.5: # decimal (aromatic)
+                    vocab_filter |= tree_vocab_byBondType[1.5]
+
+            if suitable_vocabs & vocab_filter and len(vocab_filter) < len(total_one.keys()):
+                # print("here", len(suitable_vocabs), len(vocab_filter), len(suitable_vocabs & vocab_filter))
+                suitable_vocabs = suitable_vocabs & vocab_filter
+
     else:
         suitable_vocabs |= tree_vocab_byBond[1]
         suitable_vocabs |= tree_vocab_byBond[3]["2F"]
 
+    # return list(suitable_vocabs)
     return get_vocab_via_conn(prev, root, suitable_vocabs)
 
-def get_proba(suitable_vocabs):
-    total = sum([vocab_usage[vocab] for vocab in suitable_vocabs])
-    return [vocab_usage[vocab]/total for vocab in suitable_vocabs]
+def get_proba(prev, current, suitable_vocabs):
+    
+    laplace = 5
+    two_key = "{},{}".format(current.gid, prev.gid) if prev else ""
+    one_key = "{}".format(current.gid)
+
+    probs = []
+    for vocab in suitable_vocabs:
+        cond_two_key = "{}|{}".format(vocab, two_key)
+        cond_one_key = "{}|{}".format(vocab, one_key)
+        if cond_probability_two.get(cond_two_key) and total_two.get(two_key):
+            probs.append((cond_probability_two.get(cond_two_key)*1.3+laplace)/(total_two.get(two_key)+laplace))
+        elif cond_probability_one.get(cond_one_key) and total_one.get(one_key):
+            probs.append((cond_probability_one.get(cond_one_key)+laplace)/(total_one.get(one_key)+laplace))
+        else:
+            probs.append((laplace)/(total_one.get(one_key)+laplace))
+
+    # normalize
+    total = sum([prob for prob in probs])
+    return [prob/total for prob in probs]
     
 
 #----------------------------------------------------#
 
-common_vocabs = get_common_vocabs()
 
-np.random.seed(42)
-
-MAX_ATOM_COUNT = 30
-
+MAX_ATOM_COUNT = 60
 def random_sample_tree(prev, root, depth):
     global count
     global atom_count
@@ -95,17 +147,18 @@ def random_sample_tree(prev, root, depth):
     atom_count += root.graph.number_of_nodes() - random.choice([1, 2])
 
     for i in range(neighbors_count):
-        if atom_count > MAX_ATOM_COUNT: return
+        # if atom_count > MAX_ATOM_COUNT: return
 
         count += 1
         topology = np.random.rand()
 
-        if topology > 0.5:
+        # if topology > 0.05: 
+        if atom_count < MAX_ATOM_COUNT:
             suitable_vocabs = get_suitable_vocab(prev, root, is_leaf=False)
-            probs = get_proba(suitable_vocabs)
+            probs = get_proba(prev, root, suitable_vocabs)
             idx = np.random.choice(suitable_vocabs, p=probs)
 
-            neigh = MolTreeNode(vocab(idx))
+            neigh, neigh.gid = MolTreeNode(vocab(idx)), idx
             atom_count += neigh.graph.number_of_nodes() - random.choice([1, 2])
             neigh.idx = count
 
@@ -116,10 +169,10 @@ def random_sample_tree(prev, root, depth):
 
         else:
             suitable_vocabs = get_suitable_vocab(prev, root, is_leaf=True)
-            probs = get_proba(suitable_vocabs)
+            probs = get_proba(prev, root, suitable_vocabs)
             idx = np.random.choice(suitable_vocabs, p=probs)
 
-            neigh = MolTreeNode(vocab(idx))
+            neigh, neigh.gid = MolTreeNode(vocab(idx)), idx
             atom_count += neigh.graph.number_of_nodes() - np.random.choice([1, 2])
             neigh.idx = count
 
@@ -127,67 +180,83 @@ def random_sample_tree(prev, root, depth):
             nodes_dict[count] = neigh
 
 
-gen_smiles_list = []
-for _ in range(1000):
+if __name__ == '__main__':
+    np.random.seed(42)
 
-    #--------------------------------------------------
-    count = 0
-    atom_count = 0
+    load_cond_proba()
 
-    start_idx = np.random.choice(get_start_vocabs())
-    root = MolTreeNode(vocab(start_idx))
-    root.idx = 0
-    nodes_dict = {root.idx: root}
-    edges_list = []
+    gen_smiles_list = []
+    for sample_idx in range(1000):
 
-    random_sample_tree(None, root, 0)
+        #--------------------------------------------------
+        count = 0
+        atom_count = 0
 
-    for x,y in edges_list:
-        nodes_dict[x].add_neighbor(nodes_dict[y])
-        nodes_dict[y].add_neighbor(nodes_dict[x])
-    
-    list_of_nodes = list(nodes_dict.values())
+        probs = [total_one[str(vocab)]/sum(total_one.values()) for vocab in get_start_vocabs()]
+        probs = [prob/sum(probs) for prob in probs]
+        start_idx = np.random.choice(get_start_vocabs())
+        root, root.gid = MolTreeNode(vocab(start_idx)), start_idx
+        root.idx = 0
+        nodes_dict = {root.idx: root}
+        edges_list = []
 
-    for i,node in enumerate(list_of_nodes):
-        node.nid = i + 1
-        if len(node.neighbors) > 1: #Leaf node mol is not marked
-            set_atommap(node.tri_mol, node.nid)
-            set_atommap_graph(node.graph, node.nid)
-        node.is_leaf = (len(node.neighbors) == 1)
+        random_sample_tree(None, root, 0)
 
-    #---------------------------------------------------
+        for x,y in edges_list:
+            nodes_dict[x].add_neighbor(nodes_dict[y])
+            nodes_dict[y].add_neighbor(nodes_dict[x])
+        
+        list_of_nodes = list(nodes_dict.values())
+        
 
-    root_idx = 0
-    root = list_of_nodes[root_idx]
-    cur_graph = root.graph.copy()
-    global_amap = [{}] + [{} for node in list_of_nodes] # nid starts with 1, thus the first dict is not used, just as offset
-    global_amap[root_idx+1] = {node:node for node in cur_graph.nodes()}
+        for i,node in enumerate(list_of_nodes):
+            node.nid = i + 1
+            if len(node.neighbors) > 1: #Leaf node mol is not marked
+                set_atommap(node.tri_mol, node.nid)
+                set_atommap_graph(node.graph, node.nid)
+            node.is_leaf = (len(node.neighbors) == 1)
 
-    dfs_random_assemble(cur_graph, global_amap, [], root, None, print_out=False)
+        #---------------------------------------------------
 
-    # draw_mol(cur_graph, 9999, folder="../vocab_generalization/subgraph")
-    final_graph = remove_edges_reset_idx(cur_graph)
-    # draw_mol(final_graph, 10_000, folder="../vocab_generalization/subgraph")
+        root_idx = 0
+        root = list_of_nodes[root_idx]
+        cur_graph = root.graph.copy()
+        global_amap = [{}] + [{} for node in list_of_nodes] # nid starts with 1, thus the first dict is not used, just as offset
+        global_amap[root_idx+1] = {node:node for node in cur_graph.nodes()}
 
-    # remove unconnected nodes remnants 
-    final_graph.remove_nodes_from(list(nx.isolates(final_graph)))
+        dfs_random_assemble(cur_graph, global_amap, [], root, None, print_out=False)
 
-    cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
-    dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
-    dec_mol  = Chem.MolFromSmiles(dec_smiles)
+        final_graph = remove_edges_reset_idx(cur_graph)
 
-    if cur_mol and dec_mol and dec_smiles:
-        print(dec_smiles)
+        # remove unconnected nodes remnants 
+        final_graph.remove_nodes_from(list(nx.isolates(final_graph)))
 
-        if dec_smiles not in gen_smiles_list:
-            gen_smiles_list.append(dec_smiles)
+        #----------------------------------------------#
+        cur_mol = (nx_to_mol(final_graph))
+        dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
+        dec_mol  = Chem.MolFromSmiles(dec_smiles)
 
-    # else:
-        # print(None)
+        if cur_mol and dec_mol and dec_smiles:
 
+            if dec_smiles not in gen_smiles_list:
+                # print()
+                print(dec_smiles)
+                # print(sample_idx, dec_smiles)
+                # print("num_of_nodes", len(list_of_nodes))      
+                gen_smiles_list.append(dec_smiles)
 
-with open("gen_mol_count_rand42_modified.txt", "a") as myfile:
-    for gen_smiles in gen_smiles_list:
-        myfile.writelines("{}\n".format(gen_smiles))
-    # raise
+        
+        # cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(final_graph)))
+        # dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
+        # dec_mol  = Chem.MolFromSmiles(dec_smiles)
 
+        # if cur_mol and dec_mol and dec_smiles:
+        #     print(dec_smiles)
+
+        #     if dec_smiles not in gen_smiles_list:
+        #         gen_smiles_list.append(dec_smiles)
+
+    with open("gen_mol_count_rand42_new.txt", "w") as myfile:
+        for gen_smiles in gen_smiles_list:
+            myfile.writelines("{}\n".format(gen_smiles))
+        # raise

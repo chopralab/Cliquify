@@ -13,7 +13,7 @@ from tree_decomposition2 import tree_decomp
 from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol
 
 
-with open("../zinc/all.txt") as f:
+with open("../zdata/zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from tree_decomposition2 import tree_decomp
 
-with open("../zinc/all.txt") as f:
+with open("../zdata/zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 

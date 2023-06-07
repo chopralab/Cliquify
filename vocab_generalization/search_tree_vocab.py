@@ -2,6 +2,7 @@ import sys
 sys.path.append('../')
 from rdkit import Chem
 from rdkit import RDLogger
+from collections import defaultdict
 import pickle
 import os
 
@@ -43,7 +44,6 @@ for sym in symbol_set:
             for arom in is_arom_set:
                 tree_vocab_byAtom[sym][charge][num][arom] = set()
 
-
 for i in get_common_vocabs():
     G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
     mol = nx_to_mol(G)
@@ -73,6 +73,24 @@ for i in get_common_vocabs():
         tree_vocab_byBond[num_of_bonds][bondGhost].add(i)
     else:
         tree_vocab_byBond[4].add(i)
+
+
+tree_vocab_byBondType = defaultdict(set)
+"""{
+1: set(), 1.5: set(), 2: set(), 3: set()
+}
+"""
+
+for i in get_common_vocabs():
+    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
+    
+    for bond in mol.GetBonds():
+        key = bond.GetBondTypeAsDouble()
+        tree_vocab_byBondType[key].add(i)
+    else:
+        tree_vocab_byBondType[0.0].add(i)
+
+# print(tree_vocab_byBondType.keys())
 
 with open("../vocab_generalization/vocab_usage.txt") as f:
     vocab_counts = f.readlines()

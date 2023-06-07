@@ -5,7 +5,7 @@ import networkx as nx
 
 from rdkit import Chem
 
-with open("../zinc/all.txt") as f:
+with open("../zdata/zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 def bridge_checking(cliques):

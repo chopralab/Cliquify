@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from jtnn import chemutils
 from jtnn.mol_tree import MolTree
 
-with open("../../zinc/all.txt") as f:
+with open("../../zdata/zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 

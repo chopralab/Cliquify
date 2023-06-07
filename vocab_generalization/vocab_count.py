@@ -18,7 +18,7 @@ from utils import nx_to_mol, mol_to_nx, node_equal_iso, ring_edge_equal_iso, mol
 
 
 
-with open("../zinc/all.txt") as f:
+with open("../zdata/zinc/all.txt") as f:
     smiles_list = f.readlines()
 
 
@@ -105,24 +105,27 @@ def vocab_count(idx):
         # pprint.pprint(graph_count)
         # print(x)
 
-for i in range(len(smiles_list)):
-    vocab_count(i)
 
-print()
-total_vocab_smiles = list(total_vocab_smiles)
-print("total_vocab_smiles", len(total_vocab_smiles))
-print("total_vocab_graph", len(total_vocab_graph))
+if __name__ == '__main__':
 
-# save graph vocabs
-for i, vocab_G in enumerate(total_vocab_graph):
-    pickle.dump(vocab_G, open("../vocab_generalization/graph_vocab2/{}".format(i), "wb"))
+    for i in range(len(smiles_list)):
+        vocab_count(i)
+
+    print()
+    total_vocab_smiles = list(total_vocab_smiles)
+    print("total_vocab_smiles", len(total_vocab_smiles))
+    print("total_vocab_graph", len(total_vocab_graph))
+
+    # save graph vocabs
+    # for i, vocab_G in enumerate(total_vocab_graph):
+    #     pickle.dump(vocab_G, open("../vocab_generalization/graph_vocab2/{}".format(i), "wb"))
 
 
-with open('../vocab_generalization/cond_proba/cond_probability_one.json', 'w', encoding ='utf8') as json_file:
-    json.dump(cond_probability_one, json_file) 
-with open('../vocab_generalization/cond_proba/cond_probability_two.json', 'w', encoding ='utf8') as json_file:
-    json.dump(cond_probability_two, json_file) 
-with open('../vocab_generalization/cond_proba/total_one.json', 'w', encoding ='utf8') as json_file:
-    json.dump(total_one, json_file) 
-with open('../vocab_generalization/cond_proba/total_two.json', 'w', encoding ='utf8') as json_file:
-    json.dump(total_two, json_file) 
+    with open('../vocab_generalization/cond_proba/cond_probability_one.json', 'w', encoding ='utf8') as json_file:
+        json.dump(cond_probability_one, json_file) 
+    with open('../vocab_generalization/cond_proba/cond_probability_two.json', 'w', encoding ='utf8') as json_file:
+        json.dump(cond_probability_two, json_file) 
+    with open('../vocab_generalization/cond_proba/total_one.json', 'w', encoding ='utf8') as json_file:
+        json.dump(total_one, json_file) 
+    with open('../vocab_generalization/cond_proba/total_two.json', 'w', encoding ='utf8') as json_file:
+        json.dump(total_two, json_file) 

@@ -480,9 +480,17 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
     # heuristic to candidates using fa_node/cur_node
     # graph.subgraph
 
-    label_idx = np.random.randint(0, len(cands_G))
+    valid_idxs = []
+    for idx, cand_G in enumerate(cand_Gs):
+        cand_G = remove_edges_reset_idx(cand_G)
+        cur_mol = nx_to_mol(mol_to_nx(nx_to_mol(cand_G)))
+        dec_smiles = Chem.MolToSmiles(cur_mol, isomericSmiles=False)
+        if cur_mol and dec_smiles: valid_idxs.append(idx)
+    label_idx = np.random.choice(valid_idxs)
 
-    # count += 1
+    # label_idx = np.random.randint(0, len(cands_G))
+
+
     # draw_mol(cand_Gs[label_idx], count, folder="../vocab_generalization/subgraph")
 
     label_amap = cand_amap[label_idx]

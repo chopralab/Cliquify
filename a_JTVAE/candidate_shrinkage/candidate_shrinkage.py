@@ -11,7 +11,7 @@ from jtnn.mol_tree import MolTree
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
-# with open("../../zinc/all.txt") as f:
+# with open("../../zdata/zinc/all.txt") as f:
 #     smiles_list = f.readlines()
 
 with open("../../candidate_shrinkage/many_large_rings_increment.txt") as f:
