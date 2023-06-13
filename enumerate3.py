@@ -142,7 +142,7 @@ class MolTreeNode(object):
             self.smarts = get_smarts_fragments(mol , clique)
 
             self.mol = get_mol2(mol, clique) # use mol object directly
-            self.mol = data_to_mol(mol_to_data(self.mol))
+            # self.mol = data_to_mol(mol_to_data(self.mol))
 
             # self.mol = Chem.MolFromSmiles(self.smiles) # use smiles fragment string
             # self.mol = Chem.MolFromSmarts(self.smarts) # use smarts

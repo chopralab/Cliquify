@@ -10,6 +10,7 @@ import networkx as nx
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
+from enumerate_random import get_fragments, get_fragments2
 from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol, data_to_mol
 
 VOCAB_SIZE = len(os.listdir("../vocab_generalization/graph_vocab2"))
@@ -96,3 +97,14 @@ with open("../vocab_generalization/vocab_usage.txt") as f:
     vocab_counts = f.readlines()
     vocab_usage = {int(vocab_count.split(": ")[0]) : int(vocab_count.split(": ")[1].strip()) 
                    for vocab_count in vocab_counts}
+    
+
+tree_vocab_bySMILES = defaultdict(set)
+
+for i in get_common_vocabs():
+    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
+    
+    for bond in mol.GetBonds():
+        u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        smiles = get_fragments(mol, [u, v])
+        tree_vocab_bySMILES[smiles].add(i)

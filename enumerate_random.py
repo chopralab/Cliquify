@@ -444,6 +444,13 @@ def enum_assemble(node, neighbors, prev_nodes=[], prev_amap=[], print_out=False)
 
     return candidates, candidates_G
 
+def print_all_smiles(cur_node, neighbors):
+    set_atommap(cur_node.tri_mol)
+    print(get_smiles(cur_node.tri_mol))
+    print()
+    for nei in neighbors:
+        set_atommap(nei.tri_mol)
+        print(get_smiles(nei.tri_mol))
 
 def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, print_out=False):
 
@@ -458,7 +465,11 @@ def dfs_random_assemble(cur_graph, global_amap, fa_amap, cur_node, fa_node, prin
     neighbors = singletons + neighbors
 
     cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node.nid] # check if there is any atommap has been occupied previously when attaching with parent
-    
+
+    #----
+    # print_all_smiles(cur_node, neighbors)
+    # ----
+
     cands, cands_G = enum_assemble(cur_node, neighbors, prev_nodes, cur_amap)
     
     if (not cands) and (not cands_G):
