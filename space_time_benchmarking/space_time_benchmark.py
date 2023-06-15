@@ -40,7 +40,7 @@ def decompose_reconstruct(idx):
     gold_smiles, dec_smiles, graph_match  = reconstruction_evaluation(chosen_smiles, final_graph)
 
     if gold_smiles != dec_smiles or not graph_match:
-        # print(gold_smiles, dec_smiles, idx, "fail_reconstruct")
+        print(gold_smiles, dec_smiles, idx, "fail_reconstruct")
         return "{},{},Reconstruct\n".format(gold_smiles, idx)
     
     return 

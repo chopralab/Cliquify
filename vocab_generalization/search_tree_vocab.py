@@ -62,12 +62,13 @@ tree_vocab_byBond = {
 
 for i in get_common_vocabs():
     G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
+    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
 
-    ghost_list = list(nx.get_edge_attributes(G, "ghost").values())
-    num_of_bonds = len(ghost_list)
+    num_of_bonds = mol.GetBonds()
     if num_of_bonds < 2:
         tree_vocab_byBond[num_of_bonds].add(i)
     elif num_of_bonds == 3:
+        ghost_list = list(nx.get_edge_attributes(G, "ghost").values())
         ghost_list.remove(False)
         ghost_bonds_id = sum(ghost_list)
         bondGhost = "2T" if ghost_bonds_id == 2 else "2F"
