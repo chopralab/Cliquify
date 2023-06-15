@@ -269,6 +269,7 @@ if __name__ == '__main__':
         #---------------------------------------------------
 
         possible_smiles = ""
+        possible_graph = None
         for start_idx in range(len(list_of_nodes)):
 
             root_idx = start_idx
@@ -293,12 +294,13 @@ if __name__ == '__main__':
             if cur_mol and dec_mol and dec_smiles:
                 if len(dec_smiles) > len(possible_smiles):
                     possible_smiles = dec_smiles
+                    possible_graph = cur_graph
 
 
         # if dec_smiles not in gen_smiles_list:
-        if possible_smiles and ("." not in possible_smiles) and (possible_smiles not in gen_smiles_list):
+        if possible_smiles and possible_graph and ("." not in possible_smiles) and (possible_smiles not in gen_smiles_list):
 
-            draw_mol(cur_graph, sample_idx, ["symbol", "bond_type", "color"], folder="tree", label="dec_graph")
+            draw_mol(possible_graph, sample_idx, ["symbol", "bond_type", "color"], folder="tree", label="dec_graph")
             print(possible_smiles, sample_idx)
             # print("num_of_nodes", len(list_of_nodes))      
             gen_smiles_list.append(possible_smiles)

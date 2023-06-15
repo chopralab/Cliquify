@@ -165,9 +165,7 @@ def draw_mol(cand_G, numb=0, attr=['symbol', 'bond_type', 'color'], folder="subg
     plt.savefig("{}/show{}_{}.png".format(folder, numb, label))
     plt.clf()
 
-
     return
-
 
 def attach_graphs(ctr_graph, neighbors, prev_nodes, nei_amap, print_out=False):
     prev_nids = [node.nid for node in prev_nodes]

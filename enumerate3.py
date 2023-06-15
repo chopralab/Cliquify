@@ -2,15 +2,12 @@
 from rdkit import Chem
 import itertools
 import networkx as nx
-# from Cliquify.utils import *
 from utils import *
 import networkx.algorithms.isomorphism as iso
-# from Cliquify.debug_script import *
 from debug_script import *
-from rdkit import RDLogger
 import numpy as np
-# from Cliquify.tree_decomposition2 import tree_decomp
 from tree_decomposition2 import tree_decomp
+from rdkit import RDLogger
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 import copy

@@ -8,10 +8,6 @@ from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnum
 import numpy as np
 np.random.seed(42)
 
-import timeit
-import concurrent.futures
-import multiprocessing
-
 MST_MAX_WEIGHT = 100 
 MAX_NCAND = 6000
 
@@ -538,9 +534,6 @@ if __name__ == "__main__":
     mol_tree = MolTree("C")
     assert len(mol_tree.nodes) > 0
 
-    with open("../../zdata/zinc/all.txt") as f:
-        smiles_list = f.readlines()
-
     
     def tree_test():
         for s in sys.stdin:
@@ -550,102 +543,6 @@ if __name__ == "__main__":
             print(s)
             for node in tree.nodes:
                 print(node.smiles, [x.smiles for x in node.neighbors])
-
-    def decode_test():
-        
-        wrong = 0
-        desc_count = 0
-        for tot,s in enumerate(smiles_list[:100_000]):
-
-
-            tree = MolTree(s)
-            tree.recover()
-
-            label_idx = 0
-            try: tree.nodes[label_idx]
-            except: continue
-            cur_mol = copy_edit_mol(tree.nodes[label_idx].mol)
-            global_amap = [{}] + [{} for node in tree.nodes]
-            global_amap[label_idx + 1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()}
-
-            dfs_assemble(cur_mol, global_amap, [], tree.nodes[label_idx], None)
-
-            cur_mol = cur_mol.GetMol()
-            cur_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cur_mol))
-            if not cur_mol:
-                # print(gold_smiles)
-                # print(None)
-                # print(wrong, tot + 1, "idx:", tot)
-                wrong += 1
-                print(tot, wrong, gold_smiles, "decompose")
-                # with open("fail_mol_list.txt", "a") as myfile:
-                #     # print(gold_smiles, tot)
-                #     myfile.writelines("{},{},decompose\n".format(gold_smiles, tot))
-                
-                continue
-
-            set_atommap(cur_mol)
-            dec_smiles = Chem.MolToSmiles(cur_mol)
-
-            # gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s))
-            gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s), isomericSmiles=False)
-            
-            # TEST FOR CHIRALITY DURING DECODING
-            # if s != dec_smiles:
-            #     print(tot, wrong, gold_smiles, "chirality")
-
-            if gold_smiles != dec_smiles:
-                # print(gold_smiles)
-                # print(dec_smiles)
-                wrong += 1
-                print(tot, wrong, gold_smiles, "reconstruct")
-                # with open("fail_mol_list.txt", "a") as myfile:
-                #     # print(gold_smiles, tot)
-                #     myfile.writelines("{},{},reconstruct\n".format(gold_smiles, tot))
-
-                # if len(gold_smiles) == len(dec_smiles):
-                #     desc_count += 1
-                #     # print(tot, gold_smiles, wrong, "desc prob?:", len(gold_smiles) == len(dec_smiles), desc_count)
-                    
-                #     with open("descendant_orient_awareness.txt", "a") as myfile:
-                #         # print(gold_smiles, tot)
-                #         myfile.writelines("{},{},{}\n".format(gold_smiles, dec_smiles,  tot))
-    
-    def decode_test2(idx):
-
-        s = smiles_list[idx]
-
-        tree = MolTree(s)
-        tree.recover()
-
-        label_idx = 0
-        try: tree.nodes[label_idx]
-        except: return
-        cur_mol = copy_edit_mol(tree.nodes[label_idx].mol)
-        global_amap = [{}] + [{} for node in tree.nodes]
-        global_amap[label_idx + 1] = {atom.GetIdx():atom.GetIdx() for atom in cur_mol.GetAtoms()}
-
-        dfs_assemble(cur_mol, global_amap, [], tree.nodes[label_idx], None)
-
-        cur_mol = cur_mol.GetMol()
-        cur_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cur_mol))
-        if not cur_mol:
-            print(idx, gold_smiles, "decompose")
-            return
-
-        set_atommap(cur_mol)
-        dec_smiles = Chem.MolToSmiles(cur_mol)
-
-        # gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s))
-        gold_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(s), isomericSmiles=False)
-        
-        if gold_smiles != dec_smiles:
-            # print(gold_smiles)
-            # print(dec_smiles)
-            print(idx, gold_smiles, "reconstruct")
-
-        return
-
 
     def enum_test():
         for s in sys.stdin:
@@ -671,12 +568,3 @@ if __name__ == "__main__":
             n += len(tree.nodes)
             #print(cnt * 1.0 / n)
     
-    # count()
-    # decode_test()
-    print(timeit.Timer(decode_test).timeit(number=1))
-
-    # def multi_threaded():
-    #     with concurrent.futures.ThreadPoolExecutor() as executor:
-    #         executor.map(decode_test2, [i for i in range(len(smiles_list))])
-    
-    # print(timeit.Timer(multi_threaded).timeit(number=1))
