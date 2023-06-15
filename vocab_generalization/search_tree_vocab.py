@@ -64,7 +64,7 @@ for i in get_common_vocabs():
     G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
     mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
 
-    num_of_bonds = mol.GetBonds()
+    num_of_bonds = len(mol.GetBonds())
     if num_of_bonds < 2:
         tree_vocab_byBond[num_of_bonds].add(i)
     elif num_of_bonds == 3:
