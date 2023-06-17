@@ -22,6 +22,23 @@ def add_ghost_edges(G, ghost_edges):
                 )
     return G
 
+def merge_sets(sets):
+    merged_sets = [c_set for c_set in sets]
+
+    for i, c_set1 in enumerate(merged_sets):
+        flag = 0
+        for j, c_set2 in enumerate(merged_sets):
+            if i == j: continue
+            if len(c_set1.intersection(c_set2)) > 2:
+                c_set2.update(c_set1)
+                flag = 1
+        if flag: merged_sets.remove(c_set1)
+            
+    if len(merged_sets) < len(sets):
+        return merge_sets(merged_sets)
+    else:
+        return merged_sets
+
 def tree_decomp(mol):
     n_atoms = mol.GetNumAtoms()
     for bond in mol.GetBonds(): bond.SetBoolProp(KEY, False)
@@ -39,7 +56,11 @@ def tree_decomp(mol):
             non_ring_nodes.add(a1)
             non_ring_nodes.add(a2)
 
-    ssr_list = nx.cycle_basis(graph)
+    # ssr_list = nx.cycle_basis(graph)
+    ssr_list = [set(ring) for ring in Chem.GetSymmSSSR(mol)]
+    ssr_list = merge_sets(ssr_list)
+    ssr_list = [list(ring) for ring in ssr_list]
+
 
     cliques.extend(copy.deepcopy(ssr_list))
 
@@ -99,8 +120,8 @@ def tree_decomp(mol):
         
         if not intersect_list: 
             ssr_dict[tuple(ring1)] = ring1[0]
-        elif len(intersect_list) == 1:
 
+        elif len(intersect_list) == 1:
             # [OPTIONAL] increase deterministic of ortho, meta, para attachment
             non_ring_nodes = set(ring1) & non_ring_nodes
             if non_ring_nodes:
@@ -115,8 +136,8 @@ def tree_decomp(mol):
                 ssr_dict[tuple(ring1)] = list(set(neis) & set(ring1)).pop() # choose neighbors in ring
             else: # fused
                 ssr_dict[tuple(ring1)] = inter_atoms[0] # choose intersect atoms
+        
         else:
-
             inter_comb = list(itertools.combinations(intersect_list, 2))
             inter_atoms = set() # intersection between ring intersection 
             union_inter = set()
@@ -128,8 +149,10 @@ def tree_decomp(mol):
             if inter_atoms:
                 # honeycomb structure
                 avail_sele = (union_inter - chosen_sele) - inter_atoms
-                if not avail_sele: 
-                    ssr_dict[tuple(ring1)] = list(union_inter - inter_atoms).pop()
+                if not avail_sele:
+                    if (union_inter - inter_atoms):
+                        ssr_dict[tuple(ring1)] = list(union_inter - inter_atoms).pop()
+                    else: ssr_dict[tuple(ring1)] = union_inter.pop()
                     continue
                 
                 for inter in intersect_list:

@@ -12,7 +12,7 @@ import pickle
 import json
 
 
-from enumerate3 import get_fragments, get_mol2, get_smarts_fragments, get_mol2, get_triangulated_graph
+from enumerate3 import get_fragments, get_fragments2, get_mol2, get_smarts_fragments, get_mol2, get_triangulated_graph
 from tree_decomposition2 import tree_decomp
 from utils import nx_to_mol, mol_to_nx, node_equal_iso, ring_edge_equal_iso, mol_to_data
 
@@ -117,9 +117,8 @@ if __name__ == '__main__':
     print("total_vocab_graph", len(total_vocab_graph))
 
     # save graph vocabs
-    # for i, vocab_G in enumerate(total_vocab_graph):
-    #     pickle.dump(vocab_G, open("../vocab_generalization/graph_vocab2/{}".format(i), "wb"))
-
+    for i, vocab_G in enumerate(total_vocab_graph):
+        pickle.dump(vocab_G, open("../vocab_generalization/graph_vocab/{}".format(i), "wb"))
 
     with open('../vocab_generalization/cond_proba/cond_probability_one.json', 'w', encoding ='utf8') as json_file:
         json.dump(cond_probability_one, json_file) 

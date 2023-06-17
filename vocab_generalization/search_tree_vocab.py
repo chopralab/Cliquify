@@ -5,6 +5,7 @@ from rdkit import RDLogger
 from collections import defaultdict
 import pickle
 import os
+import json
 
 import networkx as nx
 lg = RDLogger.logger()
@@ -20,6 +21,11 @@ def get_common_vocabs():
         vocab_counts = f.readlines()
         return [int(vocab_count.split(": ")[0]) for vocab_count in vocab_counts]
 
+# def get_common_vocabs():
+#     file_path = "../vocab_generalization/cond_proba/total_one.json"
+#     with open(file_path) as file:
+#         data = json.load(file)
+#     return sorted(data, key=data.get, reverse=True)
 #----------------------------------------------------------------------
 symbol_set = set()
 formal_charge_set = set()
@@ -60,11 +66,13 @@ tree_vocab_byBond = {
     4: set()
 }
 
+num_of_bonds_set = set()
 for i in get_common_vocabs():
     G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
     mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
 
     num_of_bonds = len(mol.GetBonds())
+    num_of_bonds_set.add(num_of_bonds)
     if num_of_bonds < 2:
         tree_vocab_byBond[num_of_bonds].add(i)
     elif num_of_bonds == 3:
@@ -76,6 +84,12 @@ for i in get_common_vocabs():
     else:
         tree_vocab_byBond[4].add(i)
 
+# print(num_of_bonds_set)
+# print()
+# print(tree_vocab_byBond[4])
+# for idx in tree_vocab_byBond[4]:
+#     mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(idx))
+#     print(len(mol.GetBonds()))
 
 tree_vocab_byBondType = defaultdict(set)
 """{

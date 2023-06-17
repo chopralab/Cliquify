@@ -1,5 +1,6 @@
 import networkx as nx
 from rdkit import Chem
+from rdkit.Chem import Draw
 # import matplotlib
 import matplotlib.pyplot as plt
 import itertools
@@ -102,6 +103,13 @@ def data_to_mol(filename):
     mol = nx_to_mol(G)
     return mol
 
+def save_mol_img(mol_ori, filename="mol1"):
+    mol = Chem.Mol(mol_ori)
+    label = "molAtomMapNumber"
+    for atom in mol.GetAtoms():
+        atom.SetProp(label, str(atom.GetIdx()))
+    img = Draw.MolToImage(mol)
+    img.save(f"{filename}.png")
 # ON NETWORKX GRAPH
 
 def node_equal_iso(node1, node2):

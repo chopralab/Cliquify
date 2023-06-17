@@ -57,9 +57,12 @@ def get_vocab_via_conn(prev, current, suitable_vocabs):
     all_cliq_types = list(tree_vocab_byBond.keys())
     random_rank = []
     if num_current == 0: random_rank = [1,3]; np.random.shuffle(random_rank)
-    elif num_current == 1: random_rank = all_cliq_types; np.random.shuffle(all_cliq_types) 
-    elif num_current == 3: random_rank = all_cliq_types; np.random.shuffle(all_cliq_types)
-    elif num_current == 4: random_rank = [1, 3]; np.random.shuffle(random_rank)
+    elif num_current == 1: random_rank = [0, 1, 3]; np.random.shuffle(random_rank) 
+    elif num_current == 3: random_rank = [0, 1, 3]; np.random.shuffle(random_rank)
+    
+    # elif num_current == 1: random_rank = all_cliq_types; np.random.shuffle(all_cliq_types) 
+    # elif num_current == 3: random_rank = all_cliq_types; np.random.shuffle(all_cliq_types)
+    # elif num_current == 4: random_rank = [1, 3]; np.random.shuffle(random_rank)
     
     for clq_size in random_rank:
         if clq_size == 3: filter_vocab = tree_vocab_byBond[clq_size]["2F"] | tree_vocab_byBond[clq_size]["2T"]
@@ -92,7 +95,7 @@ def get_suitable_vocab(prev, root, is_leaf=False, filter_edge=False):
             suitable_vocabs |= (vocab1 & vocab2 & tree_vocab_bySMILES[smiles])
 
     if is_leaf:
-        leaf_filter = tree_vocab_byBond[1] & tree_vocab_byBond[3]["2F"]
+        leaf_filter = tree_vocab_byBond[1] | tree_vocab_byBond[3]["2F"]
         if suitable_vocabs & leaf_filter:
             suitable_vocabs = (suitable_vocabs & leaf_filter)
 
@@ -116,14 +119,14 @@ def get_suitable_vocab(prev, root, is_leaf=False, filter_edge=False):
         if suitable_vocabs & vocab_filter and len(vocab_filter) < len(total_one.keys()):
             suitable_vocabs = suitable_vocabs & vocab_filter
         
+    # # if nothing left, use this
+    # if not suitable_vocabs:
+    #     for idx, data in root.graph.nodes.data():
+    #         sym, chrg, hs, arom, _ = data.values()
+    #         suitable_vocabs |= tree_vocab_byAtom[sym][chrg][hs][arom]
+
     # remove all bridge[OPTIONAL]
     suitable_vocabs = suitable_vocabs - tree_vocab_byBond[4]
-
-    # if nothing left, use this
-    if not suitable_vocabs:
-        for idx, data in root.graph.nodes.data():
-            sym, chrg, hs, arom, _ = data.values()
-            suitable_vocabs |= tree_vocab_byAtom[sym][chrg][hs][arom]
 
     return get_vocab_via_conn(prev, root, suitable_vocabs)
 
@@ -180,6 +183,7 @@ def random_sample_tree(prev, root, depth):
         # if topology > 0.05: 
         if atom_count < MAX_ATOM_COUNT:
             suitable_vocabs = get_suitable_vocab(prev, root, is_leaf=False)
+            if not suitable_vocabs: return # if unable to generate suitable terminate
             probs = get_proba(prev, root, suitable_vocabs)
             idx = np.random.choice(suitable_vocabs, p=probs)
 
@@ -194,6 +198,7 @@ def random_sample_tree(prev, root, depth):
 
         else:
             suitable_vocabs = get_suitable_vocab(prev, root, is_leaf=True)
+            if not suitable_vocabs: return # if unable to generate suitable terminate
             probs = get_proba(prev, root, suitable_vocabs)
             idx = np.random.choice(suitable_vocabs, p=probs)
 
