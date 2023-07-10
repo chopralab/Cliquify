@@ -14,18 +14,18 @@ lg.setLevel(RDLogger.CRITICAL)
 from enumerate_random import get_fragments, get_fragments2
 from utils import nx_to_mol, mol_to_nx, node_equal_iso2, ring_edge_equal_iso, draw_mol, data_to_mol
 
-VOCAB_SIZE = len(os.listdir("../vocab_generalization/graph_vocab2"))
-
-def get_common_vocabs():
-    with open("../vocab_generalization/vocab_usage.txt") as f:
-        vocab_counts = f.readlines()
-        return [int(vocab_count.split(": ")[0]) for vocab_count in vocab_counts]
+VOCAB_SIZE = len(os.listdir("../vocab_generalization/graph_vocab"))
 
 # def get_common_vocabs():
-#     file_path = "../vocab_generalization/cond_proba/total_one.json"
-#     with open(file_path) as file:
-#         data = json.load(file)
-#     return sorted(data, key=data.get, reverse=True)
+#     with open("../vocab_generalization/vocab_usage.txt") as f:
+#         vocab_counts = f.readlines()
+#         return [int(vocab_count.split(": ")[0]) for vocab_count in vocab_counts]
+
+def get_common_vocabs():
+    file_path = "../vocab_generalization/cond_proba/total_one.json"
+    with open(file_path) as file:
+        data = json.load(file)
+    return sorted(data, key=data.get, reverse=True)
 #----------------------------------------------------------------------
 symbol_set = set()
 formal_charge_set = set()
@@ -34,7 +34,7 @@ is_arom_set = set()
 
 for i in get_common_vocabs():
     # mol = data_to_mol("../vocab_generalization/graph_vocab/{}".format(i))
-    G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
+    G = pickle.load(open("../vocab_generalization/graph_vocab/{}".format(i), "rb"))
 
     symbol_set |= set(nx.get_node_attributes(G, "symbol").values())
     formal_charge_set |= set(nx.get_node_attributes(G, "formal_charge").values())
@@ -52,7 +52,7 @@ for sym in symbol_set:
                 tree_vocab_byAtom[sym][charge][num][arom] = set()
 
 for i in get_common_vocabs():
-    G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
+    G = pickle.load(open("../vocab_generalization/graph_vocab/{}".format(i), "rb"))
     mol = nx_to_mol(G)
     for idx, data in G.nodes.data():
         sym, chrg, hs, arom, _ = data.values()
@@ -68,8 +68,8 @@ tree_vocab_byBond = {
 
 num_of_bonds_set = set()
 for i in get_common_vocabs():
-    G = pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(i), "rb"))
-    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
+    G = pickle.load(open("../vocab_generalization/graph_vocab/{}".format(i), "rb"))
+    mol = data_to_mol("../vocab_generalization/graph_vocab/{}".format(i))
 
     num_of_bonds = len(mol.GetBonds())
     num_of_bonds_set.add(num_of_bonds)
@@ -88,7 +88,7 @@ for i in get_common_vocabs():
 # print()
 # print(tree_vocab_byBond[4])
 # for idx in tree_vocab_byBond[4]:
-#     mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(idx))
+#     mol = data_to_mol("../vocab_generalization/graph_vocab/{}".format(idx))
 #     print(len(mol.GetBonds()))
 
 tree_vocab_byBondType = defaultdict(set)
@@ -98,7 +98,7 @@ tree_vocab_byBondType = defaultdict(set)
 """
 
 for i in get_common_vocabs():
-    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
+    mol = data_to_mol("../vocab_generalization/graph_vocab/{}".format(i))
     
     for bond in mol.GetBonds():
         key = bond.GetBondTypeAsDouble()
@@ -108,16 +108,18 @@ for i in get_common_vocabs():
 
 # print(tree_vocab_byBondType.keys())
 
-with open("../vocab_generalization/vocab_usage.txt") as f:
-    vocab_counts = f.readlines()
-    vocab_usage = {int(vocab_count.split(": ")[0]) : int(vocab_count.split(": ")[1].strip()) 
-                   for vocab_count in vocab_counts}
-    
+# with open("../vocab_generalization/vocab_usage.txt") as f:
+#     vocab_counts = f.readlines()
+#     vocab_usage = {int(vocab_count.split(": ")[0]) : int(vocab_count.split(": ")[1].strip()) 
+#                    for vocab_count in vocab_counts}
+
+with open("../vocab_generalization/cond_proba/total_one.json") as f:
+    vocab_usage = json.load(f)
 
 tree_vocab_bySMILES = defaultdict(set)
 
 for i in get_common_vocabs():
-    mol = data_to_mol("../vocab_generalization/graph_vocab2/{}".format(i))
+    mol = data_to_mol("../vocab_generalization/graph_vocab/{}".format(i))
     
     for bond in mol.GetBonds():
         u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()

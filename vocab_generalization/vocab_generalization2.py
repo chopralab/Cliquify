@@ -31,10 +31,10 @@ def load_cond_proba():
         total_two = json.load(json_file)
 
 def vocab(idx):
-    return data_to_mol("../vocab_generalization/graph_vocab2/{}".format(idx))
+    return data_to_mol("../vocab_generalization/graph_vocab/{}".format(idx))
 
 def graph(idx):
-    return pickle.load(open("../vocab_generalization/graph_vocab2/{}".format(idx), "rb"))
+    return pickle.load(open("../vocab_generalization/graph_vocab/{}".format(idx), "rb"))
 
 def get_start_vocabs():
     suitable_vocabs = set()

@@ -80,9 +80,9 @@ def get_fragments(mol, atoms):
     except: return Chem.MolFragmentToSmiles(mol, atoms)
 
 def get_fragments2(mol, atoms):
-    try: return Chem.MolFragmentToSmiles(mol, atoms, kekuleSmiles=True, allHsExplicit=True)
+    try: return Chem.MolFragmentToSmiles(mol, atoms, kekuleSmiles=True, canonical=True, allBondsExplicit=True, allHsExplicit=True)
     except: 
-        return Chem.MolFragmentToSmiles(mol, atoms, allHsExplicit=True)
+        return Chem.MolFragmentToSmiles(mol, atoms, allHsExplicit=True, allBondsExplicit=True)
 
 def get_smarts_fragments(mol, atoms):
     return Chem.MolFragmentToSmarts(mol, atoms)
@@ -163,7 +163,7 @@ class MolTreeNode(object):
         # all_edges = list(self.graph.edges())
         for nei_node in self.neighbors:
             clique.append(nei_node.clique)
-            # all_edges.extend(list(self.graph.edges()))
+            # all_edges.extend(liglobast(self.graph.edges()))
             if nei_node.is_leaf: #Leaf node, no need to mark 
                 continue
             for cidx in nei_node.clique:

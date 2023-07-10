@@ -14,7 +14,7 @@ import json
 
 from enumerate3 import get_fragments, get_fragments2, get_mol2, get_smarts_fragments, get_mol2, get_triangulated_graph
 from tree_decomposition2 import tree_decomp
-from utils import nx_to_mol, mol_to_nx, node_equal_iso, ring_edge_equal_iso, mol_to_data
+from utils import nx_to_mol, mol_to_nx, node_equal_iso, ring_edge_equal_iso, mol_to_data, node_exact, edge_exact
 
 
 
@@ -36,9 +36,9 @@ def vocab_count(idx):
     chosen_smiles = smiles_list[idx]
     mol = Chem.MolFromSmiles(chosen_smiles)
 
-    # remove stereochemistry
-    gold_smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
-    mol = Chem.MolFromSmiles(gold_smiles)
+    # # remove stereochemistry
+    # gold_smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
+    # mol = Chem.MolFromSmiles(gold_smiles)
 
     cliques, edges, _ = tree_decomp(mol)
 
@@ -55,20 +55,20 @@ def vocab_count(idx):
 
             duplicate=False
             for g_idx, G in enumerate(total_vocab_graph):
-                if nx.is_isomorphic(G, fragment_graph, node_match=node_equal_iso, edge_match=ring_edge_equal_iso):
+                if nx.is_isomorphic(G, fragment_graph, node_match=node_exact, edge_match=edge_exact):
                     duplicate = True
                     graph_count[g_idx] += 1
                     cliqId_to_graphId[i] = g_idx
                     break
             if duplicate: continue
 
-            total_vocab_smiles.add(fragment_smiles)
-            total_vocab_smiles_smarts.add(fragment_smiles + "|" + canon_smiles + "|" + fragment_smarts)
-            total_vocab_graph.append(fragment_graph)
-            
             graph_count[len(total_vocab_graph)] += 1
             cliqId_to_graphId[i] = len(total_vocab_graph)
     
+            total_vocab_smiles.add(fragment_smiles)
+            total_vocab_smiles_smarts.add(fragment_smiles + "|" + canon_smiles + "|" + fragment_smarts)
+            total_vocab_graph.append(fragment_graph)
+
     # for conditional sampling
     for st, ed in edges:
         u, v = cliqId_to_graphId[st], cliqId_to_graphId[ed]
